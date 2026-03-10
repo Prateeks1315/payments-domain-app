@@ -1,94 +1,145 @@
-import { useState, memo, useEffect, useRef } from "react";
+import { useState, memo, useEffect, useRef, useContext, createContext } from "react";
 
-const C = {
-  bg: '#070b14', surface: '#0d1320', surface2: '#111827', border: '#1a2540',
-  cyan: '#00e5ff', gold: '#ffd700', green: '#00ff88', orange: '#ff6b35',
-  purple: '#a855f7', pink: '#ec4899', teal: '#2dd4bf', red: '#ff3b3b',
-  blue: '#3b82f6', lime: '#84cc16', text: '#e0e8ff', muted: '#7080a0',
+/* ─── THEME SYSTEM ─── */
+const ThemeCtx = createContext(null);
+const useT = () => useContext(ThemeCtx);
+
+const makePalette = (dark) => ({
+  bg:         dark ? '#070b14'   : '#f0f5ff',
+  surface:    dark ? '#0d1320'   : '#ffffff',
+  surface2:   dark ? '#111827'   : '#f5f9ff',
+  border:     dark ? '#1a2540'   : '#d1dff5',
+  text:       dark ? '#e0e8ff'   : '#1a2e52',
+  muted:      dark ? '#7080a0'   : '#5a6e8c',
+  body:       dark ? '#b0c4de'   : '#344c6e',
+  faint:      dark ? '#606878'   : '#8a9ab8',
+  stepDone:   dark ? '#90a0b8'   : '#64748b',
+  tableBg:    dark ? '#08101e'   : '#e8f0fc',
+  codeBg:     dark ? '#0a0f1a'   : '#eff4ff',
+  rowBorder:  dark ? '#0d1520'   : '#e6eef8',
+  rowAlt:     dark ? 'rgba(255,255,255,0.008)' : 'rgba(59,130,246,0.03)',
+  hoverBg:    dark ? 'rgba(0,229,255,0.06)'    : 'rgba(37,99,235,0.07)',
+  inputBg:    dark ? '#0a1020'   : '#f0f5ff',
+  headerBg:   dark ? 'linear-gradient(135deg,#0a1020,#0d1830)' : 'linear-gradient(135deg,#1e3a8a,#1d4ed8)',
+  headerMuted:dark ? '#7080a0'   : '#93c5fd',
+  tabActive:  dark ? '#00e5ff'   : '#bfdbfe',
+  tabActiveBg:dark ? 'rgba(0,229,255,0.12)' : 'rgba(255,255,255,0.18)',
+  tabBorder:  dark ? 'rgba(0,229,255,0.35)' : 'rgba(255,255,255,0.4)',
+  tabInactive:dark ? '#7080a0'   : 'rgba(255,255,255,0.6)',
+  tabInactiveBorder: dark ? '#1a2540' : 'rgba(255,255,255,0.15)',
+  cyan:    dark ? '#00e5ff' : '#0369a1',
+  gold:    dark ? '#ffd700' : '#92400e',
+  green:   dark ? '#00ff88' : '#166534',
+  orange:  dark ? '#ff6b35' : '#c2410c',
+  purple:  dark ? '#a855f7' : '#7c3aed',
+  pink:    dark ? '#ec4899' : '#be185d',
+  teal:    dark ? '#2dd4bf' : '#0f766e',
+  red:     dark ? '#ff3b3b' : '#dc2626',
+  blue:    dark ? '#3b82f6' : '#2563eb',
+  lime:    dark ? '#84cc16' : '#4d7c0f',
+});
+
+/* ─── REUSABLE PRIMITIVES (all use ThemeCtx) ─── */
+const Tag = ({ label, color }) => {
+  const C = useT();
+  return <span style={{ background:`${color}15`, border:`1px solid ${color}35`, borderRadius:'5px', padding:'3px 10px', fontSize:'13px', color: color, display:'inline-block', margin:'2px', fontWeight:'500' }}>{label}</span>;
 };
 
-/* ─── Reusable primitives ─── */
-const Tag = ({ label, color }) => (
-  <span style={{ background:`${color}12`, border:`1px solid ${color}28`, borderRadius:'4px', padding:'3px 9px', fontSize:'11.5px', color:'#c8d8f0', display:'inline-block', margin:'2px' }}>{label}</span>
-);
+const SectionCard = ({ title, color, icon, children, noPad }) => {
+  const C = useT();
+  return (
+    <div style={{ background:C.surface, border:`1px solid ${color}28`, borderRadius:'14px', padding: noPad ? '0' : '22px', marginBottom:'18px', boxShadow: C.bg==='#070b14' ? `0 0 28px ${color}08` : `0 4px 20px rgba(0,0,0,0.06)` }}>
+      {title && (
+        <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'16px', paddingBottom:'13px', padding: noPad ? '18px 22px 13px' : undefined, borderBottom:`1px solid ${color}20` }}>
+          <span style={{ fontSize:'19px' }}>{icon}</span>
+          <span style={{ color, fontWeight:'700', fontSize:'15px', letterSpacing:'0.4px' }}>{title}</span>
+        </div>
+      )}
+      <div style={{ padding: noPad ? '0 22px 22px' : undefined }}>{children}</div>
+    </div>
+  );
+};
 
-const SectionCard = ({ title, color, icon, children, noPad }) => (
-  <div style={{ background:C.surface, border:`1px solid ${color}25`, borderRadius:'12px', padding: noPad ? '0' : '20px', marginBottom:'16px', boxShadow:`0 0 24px ${color}08` }}>
-    {title && (
-      <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'16px', paddingBottom:'12px', padding: noPad ? '16px 20px 12px' : undefined, borderBottom:`1px solid ${color}18` }}>
-        <span style={{ fontSize:'18px' }}>{icon}</span>
-        <span style={{ color, fontWeight:'700', fontSize:'14px', letterSpacing:'0.5px' }}>{title}</span>
-      </div>
-    )}
-    <div style={{ padding: noPad ? '0 20px 20px' : undefined }}>{children}</div>
-  </div>
-);
-
-const RichTable = ({ headers, rows, colColors }) => (
-  <div style={{ overflowX:'auto', marginTop:'8px' }}>
-    <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'12px', minWidth: `${headers.length * 120}px` }}>
-      <thead>
-        <tr style={{ borderBottom:`1px solid ${C.border}` }}>
-          {headers.map((h,i) => (
-            <th key={i} style={{ padding:'10px 12px', textAlign:'left', color: colColors?.[i] || C.muted, fontSize:'11px', fontWeight:'700', background:'#08101e', whiteSpace:'nowrap', textTransform:'uppercase', letterSpacing:'0.4px' }}>{h}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row, ri) => (
-          <tr key={ri} style={{ borderBottom:`1px solid #0d1520`, background: ri%2===0 ? 'transparent' : 'rgba(255,255,255,0.008)' }}>
-            {row.map((cell, ci) => (
-              <td key={ci} style={{ padding:'10px 12px', color: ci===0 ? (colColors?.[0] || C.cyan) : '#b8c8e0', fontSize:'12px', fontWeight: ci===0 ? '600' : '400', verticalAlign:'top', lineHeight:'1.5' }}>{cell}</td>
+const RichTable = ({ headers, rows, colColors }) => {
+  const C = useT();
+  return (
+    <div style={{ overflowX:'auto', marginTop:'10px' }}>
+      <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'13px', minWidth:`${headers.length*130}px` }}>
+        <thead>
+          <tr style={{ borderBottom:`2px solid ${C.border}` }}>
+            {headers.map((h,i) => (
+              <th key={i} style={{ padding:'11px 14px', textAlign:'left', color: colColors?.[i] || C.muted, fontSize:'12px', fontWeight:'700', background:C.tableBg, whiteSpace:'nowrap', textTransform:'uppercase', letterSpacing:'0.5px' }}>{h}</th>
             ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
-);
+        </thead>
+        <tbody>
+          {rows.map((row,ri) => (
+            <tr key={ri} style={{ borderBottom:`1px solid ${C.rowBorder}`, background: ri%2===0 ? 'transparent' : C.rowAlt }}>
+              {row.map((cell,ci) => (
+                <td key={ci} style={{ padding:'11px 14px', color: ci===0 ? (colColors?.[0]||C.cyan) : C.body, fontSize:'13px', fontWeight: ci===0 ? '600' : '400', verticalAlign:'top', lineHeight:'1.55' }}>{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
 
-const BANote = ({ text, color = C.gold }) => (
-  <div style={{ display:'flex', gap:'10px', padding:'12px 16px', background:`${color}09`, border:`1px solid ${color}25`, borderRadius:'8px', marginTop:'12px' }}>
-    <span style={{ fontSize:'16px', flexShrink:0 }}>📌</span>
-    <span style={{ color:'#c8d8e8', fontSize:'12px', lineHeight:'1.6' }}><strong style={{ color }}>BA Note: </strong>{text}</span>
-  </div>
-);
+const BANote = ({ text, color }) => {
+  const C = useT();
+  const clr = color || C.gold;
+  return (
+    <div style={{ display:'flex', gap:'10px', padding:'13px 16px', background:`${clr}10`, border:`1px solid ${clr}28`, borderRadius:'9px', marginTop:'14px' }}>
+      <span style={{ fontSize:'17px', flexShrink:0 }}>📌</span>
+      <span style={{ color:C.body, fontSize:'13px', lineHeight:'1.65' }}><strong style={{ color:clr }}>BA Note: </strong>{text}</span>
+    </div>
+  );
+};
 
-const Insight = ({ text, color = C.cyan }) => (
-  <div style={{ display:'flex', gap:'10px', padding:'10px 14px', background:`${color}08`, border:`1px solid ${color}20`, borderRadius:'7px', marginTop:'8px' }}>
-    <span style={{ fontSize:'14px', flexShrink:0 }}>💡</span>
-    <span style={{ color:'#b8cce0', fontSize:'11.5px', lineHeight:'1.55' }}>{text}</span>
-  </div>
-);
+const Insight = ({ text, color }) => {
+  const C = useT();
+  const clr = color || C.cyan;
+  return (
+    <div style={{ display:'flex', gap:'10px', padding:'11px 15px', background:`${clr}09`, border:`1px solid ${clr}22`, borderRadius:'8px', marginTop:'10px' }}>
+      <span style={{ fontSize:'15px', flexShrink:0 }}>💡</span>
+      <span style={{ color:C.body, fontSize:'13px', lineHeight:'1.6' }}>{text}</span>
+    </div>
+  );
+};
 
-const FlowRow = ({ steps, color }) => (
-  <div style={{ display:'flex', flexWrap:'wrap', alignItems:'center', gap:'6px', margin:'10px 0' }}>
-    {steps.map((s,i) => (
-      <span key={i} style={{ display:'flex', alignItems:'center', gap:'6px' }}>
-        <span style={{ padding:'7px 14px', background:`${color}10`, border:`1px solid ${color}30`, borderRadius:'8px', color, fontWeight:'600', fontSize:'12px', whiteSpace:'nowrap' }}>{s}</span>
-        {i < steps.length-1 && <span style={{ color:C.muted, fontSize:'18px', lineHeight:'1' }}>→</span>}
-      </span>
-    ))}
-  </div>
-);
+const FlowRow = ({ steps, color }) => {
+  const C = useT();
+  return (
+    <div style={{ display:'flex', flexWrap:'wrap', alignItems:'center', gap:'7px', margin:'12px 0' }}>
+      {steps.map((s,i) => (
+        <span key={i} style={{ display:'flex', alignItems:'center', gap:'7px' }}>
+          <span style={{ padding:'8px 15px', background:`${color}12`, border:`1px solid ${color}32`, borderRadius:'9px', color, fontWeight:'600', fontSize:'13px', whiteSpace:'nowrap' }}>{s}</span>
+          {i < steps.length-1 && <span style={{ color:C.muted, fontSize:'19px', lineHeight:'1' }}>→</span>}
+        </span>
+      ))}
+    </div>
+  );
+};
 
 const TreeNode = memo(({ node, depth=0 }) => {
+  const C = useT();
   const [open, setOpen] = useState(depth < 2);
   const has = node.children?.length > 0;
   const clr = depth===0 ? C.gold : depth===1 ? C.cyan : depth===2 ? C.teal : C.text;
-  const fz = depth===0 ? '15px' : depth===1 ? '13.5px' : '12.5px';
+  const fz = depth===0 ? '16px' : depth===1 ? '14.5px' : '13.5px';
   return (
-    <div style={{ marginLeft:depth>0?'18px':'0', borderLeft:depth>0?`1px solid ${C.border}`:'none' }}>
+    <div style={{ marginLeft:depth>0?'20px':'0', borderLeft:depth>0?`1px solid ${C.border}`:'none' }}>
       <div onClick={() => has && setOpen(!open)}
-        style={{ display:'flex', alignItems:'flex-start', gap:'8px', padding:'5px 8px', margin:'2px 0', borderRadius:'5px', cursor:has?'pointer':'default' }}
-        onMouseEnter={e => e.currentTarget.style.background='rgba(0,229,255,0.05)'}
+        style={{ display:'flex', alignItems:'flex-start', gap:'9px', padding:'6px 9px', margin:'2px 0', borderRadius:'6px', cursor:has?'pointer':'default' }}
+        onMouseEnter={e => e.currentTarget.style.background=C.hoverBg}
         onMouseLeave={e => e.currentTarget.style.background='transparent'}>
-        <span style={{ color:C.muted, fontSize:'11px', marginTop:'3px', minWidth:'12px', flexShrink:0 }}>
+        <span style={{ color:C.muted, fontSize:'12px', marginTop:'3px', minWidth:'13px', flexShrink:0 }}>
           {has ? (open?'▼':'▶') : '—'}
         </span>
         <div>
           <span style={{ color:clr, fontWeight:depth<2?'600':'400', fontSize:fz }}>{node.label}</span>
-          {node.def && <span style={{ color:C.muted, fontSize:'11.5px', marginLeft:'8px' }}>· {node.def}</span>}
+          {node.def && <span style={{ color:C.muted, fontSize:'12.5px', marginLeft:'9px' }}>· {node.def}</span>}
         </div>
       </div>
       {has && open && node.children.map((c,i) => <TreeNode key={c.label||i} node={c} depth={depth+1} />)}
@@ -96,19 +147,22 @@ const TreeNode = memo(({ node, depth=0 }) => {
   );
 });
 
-const PhaseStep = ({ num, title, color, body, tags, connector=true }) => (
-  <div style={{ display:'flex', alignItems:'stretch' }}>
-    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', width:'52px', flexShrink:0 }}>
-      <div style={{ width:'38px', height:'38px', borderRadius:'50%', background:`${color}20`, border:`2px solid ${color}`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'700', color, fontSize:'14px', zIndex:1 }}>{num}</div>
-      {connector && <div style={{ width:'2px', flex:1, minHeight:'32px', background:`${color}40`, margin:'3px 0' }} />}
+const PhaseStep = ({ num, title, color, body, tags, connector=true }) => {
+  const C = useT();
+  return (
+    <div style={{ display:'flex', alignItems:'stretch' }}>
+      <div style={{ display:'flex', flexDirection:'column', alignItems:'center', width:'54px', flexShrink:0 }}>
+        <div style={{ width:'40px', height:'40px', borderRadius:'50%', background:`${color}20`, border:`2px solid ${color}`, display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'700', color, fontSize:'15px', zIndex:1 }}>{num}</div>
+        {connector && <div style={{ width:'2px', flex:1, minHeight:'34px', background:`${color}35`, margin:'3px 0' }} />}
+      </div>
+      <div style={{ flex:1, marginLeft:'13px', marginBottom:connector?'9px':'0', background:`${color}08`, border:`1px solid ${color}25`, borderRadius:'9px', padding:'15px 18px' }}>
+        <div style={{ fontWeight:'700', color, fontSize:'14px', marginBottom:'9px' }}>{title}</div>
+        {body && <p style={{ color:C.body, fontSize:'13px', lineHeight:'1.65', marginBottom:'9px' }}>{body}</p>}
+        {tags && <div style={{ display:'flex', flexWrap:'wrap' }}>{tags.map((t,i) => <Tag key={i} label={t} color={color} />)}</div>}
+      </div>
     </div>
-    <div style={{ flex:1, marginLeft:'12px', marginBottom:connector?'8px':'0', background:`${color}07`, border:`1px solid ${color}22`, borderRadius:'8px', padding:'14px 16px' }}>
-      <div style={{ fontWeight:'700', color, fontSize:'13px', marginBottom:'8px' }}>{title}</div>
-      {body && <p style={{ color:'#b0c4de', fontSize:'12px', lineHeight:'1.6', marginBottom:'8px' }}>{body}</p>}
-      {tags && <div style={{ display:'flex', flexWrap:'wrap' }}>{tags.map((t,i) => <Tag key={i} label={t} color={color} />)}</div>}
-    </div>
-  </div>
-);
+  );
+};
 
 const TABS = [
   '🗺 Domain Tree','👥 Ecosystem & Types','🚆 India Rails',
@@ -119,6 +173,7 @@ const TABS = [
 
 export default function App() {
   const [tab, setTab] = useState(0);
+  const [dark, setDark] = useState(false);
   const [simMethod, setSimMethod] = useState('card');
   const [simStep, setSimStep] = useState(-1);
   const [simRunning, setSimRunning] = useState(false);
@@ -126,6 +181,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const simRef = useRef(null);
   const activeStepRef = useRef(null);
+  const C = makePalette(dark);
 
   useEffect(() => {
     if (!simRunning || !autoPlay) return;
@@ -255,7 +311,6 @@ export default function App() {
     ]
   };
 
-  /* ─── CARD PHASES ─── */
   const cardPhases = [
     { num:'1', title:'INITIATION', color:C.cyan, body:'Customer initiates payment — swipes/taps/dips card at POS, enters card details online (CNP), or scans QR. Payment instruction captured by merchant\'s POS terminal or Payment Gateway SDK.', tags:['Idempotency key generated (unique Txn ID)', 'Card Present (CP) vs Card Not Present (CNP)', 'NFC contactless / Chip & PIN / Magstripe', 'QR-triggered (UPI or dynamic QR)'] },
     { num:'2', title:'AUTHENTICATION', color:C.purple, body:'Before authorization, the identity of the payer is verified. 3D Secure 2.0 is mandatory in India for all online card transactions.', tags:['Card Present: PIN entry + EMV chip read', 'CNP Online: 3DS2 OTP (mandatory India)', 'Contactless <₹5K: no PIN required', 'UPI: 6-digit PIN + device binding', 'Biometric: fingerprint/face (2025, up to ₹5K)', 'ACS decides: Frictionless vs Challenge'] },
@@ -266,9 +321,8 @@ export default function App() {
     { num:'7', title:'RECONCILIATION', color:C.pink, body:'All systems verify their records match. Exception handling begins for any mismatches found.', tags:['Merchant: POS vs gateway vs bank statement', 'Acquirer: txns sent vs funds received from issuers', 'Detects: duplicates, missing, amount mismatches, timing', 'Exception report → Ops team → Investigation', 'MDR split verified; rolling reserve calculated'] },
   ];
 
-  /* ─── UPI STEPS ─── */
   const upiSteps = [
-    { num:1, actor:'📱 Customer (TPAP)', action:'Opens PhonePe/GPay · Scans merchant QR or enters VPA; confirms amount', tech:'UPI App / SDK', color:C.cyan },
+    { num:1, actor:'📱 Customer (TPAP)', action:'Opens PhonePe/GPay · Scans merchant QR code or enters VPA; confirms amount', tech:'UPI App / SDK', color:C.cyan },
     { num:2, actor:'📱 TPAP', action:'Decodes QR; displays "Pay ₹X to [Merchant]" confirmation; encrypts UPI PIN on-device', tech:'UPI 2.0 API', color:C.purple },
     { num:3, actor:'🏦 PSP Bank', action:'Receives debit request with encrypted PIN; routes to NPCI UPI Switch', tech:'ISO 8583 / UPI Protocol', color:C.gold },
     { num:4, actor:'🔀 NPCI Switch', action:'Validates VPA; routes to Remitter Bank; logs transaction in real-time', tech:'24×7 Real-time Switch', color:C.teal },
@@ -278,7 +332,6 @@ export default function App() {
     { num:8, actor:'📲 All Parties', action:'NPCI fires success/failure to both TPAPs; SMS + push notifications sent', tech:'Webhook / Push Notif', color:C.cyan },
   ];
 
-  /* ─── SIMULATOR FLOWS ─── */
   const SIM_FLOWS = {
     card:[
       { actor:'🛒 Customer', action:'Enters card details at checkout · Merchant calls POST /v1/orders', color:C.cyan, tech:'Idempotency Key generated' },
@@ -360,38 +413,45 @@ export default function App() {
   };
 
   return (
-    <div style={{ background:C.bg, minHeight:'100vh', fontFamily:'"Segoe UI", system-ui, sans-serif', color:C.text }}>
+    <ThemeCtx.Provider value={C}>
+    <div style={{ background:C.bg, minHeight:'100vh', fontFamily:'"Segoe UI", system-ui, sans-serif', color:C.text, transition:'background 0.25s, color 0.25s' }}>
 
       {/* ─── HEADER ─── */}
-      <div style={{ background:'linear-gradient(135deg, #0a1020, #0d1830)', borderBottom:`1px solid ${C.border}`, padding:'20px 28px' }}>
+      <div style={{ background:C.headerBg, borderBottom:`1px solid rgba(255,255,255,0.12)`, padding:'20px 28px' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:'16px', marginBottom:'16px', flexWrap:'wrap' }}>
           <div style={{ display:'flex', alignItems:'center', gap:'16px' }}>
-            <div style={{ width:'46px', height:'46px', borderRadius:'12px', background:'linear-gradient(135deg, #00e5ff, #0055ff)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'22px', boxShadow:'0 0 24px #00e5ff30' }}>💳</div>
+            <div style={{ width:'48px', height:'48px', borderRadius:'12px', background:'linear-gradient(135deg,#60a5fa,#3b82f6)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'23px', boxShadow:'0 0 24px rgba(96,165,250,0.4)' }}>💳</div>
             <div>
-              <h1 style={{ margin:0, fontSize:'20px', fontWeight:'800', color:'#fff', letterSpacing:'-0.3px' }}>Payments Domain — Master Reference</h1>
-              <p style={{ margin:'4px 0 0', color:C.muted, fontSize:'12px' }}>Complete depth · Every layer · India-specific · Internal workings · BA-grade notes throughout</p>
+              <h1 style={{ margin:0, fontSize:'21px', fontWeight:'800', color:'#fff', letterSpacing:'-0.3px' }}>Payments Domain — Master Reference</h1>
+              <p style={{ margin:'4px 0 0', color:C.headerMuted, fontSize:'13px' }}>Complete depth · Every layer · India-specific · Internal workings · BA-grade notes throughout</p>
             </div>
           </div>
-          <div style={{ background:`${C.gold}12`, border:`1px solid ${C.gold}30`, borderRadius:'8px', padding:'8px 16px', display:'flex', alignItems:'center', gap:'8px' }}>
-            <span style={{ fontSize:'18px' }}>✦</span>
-            <div>
-              <div style={{ color:C.gold, fontWeight:'700', fontSize:'13px' }}>Made by Prateek</div>
-              <div style={{ color:C.muted, fontSize:'10px' }}>Payments Domain · BA Reference 2025</div>
+          <div style={{ display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap' }}>
+            {/* Theme Toggle */}
+            <button onClick={() => setDark(d => !d)} style={{ display:'flex', alignItems:'center', gap:'8px', padding:'8px 16px', borderRadius:'20px', background: dark ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.15)', border:'1px solid rgba(255,255,255,0.3)', color:'#fff', cursor:'pointer', fontSize:'13px', fontWeight:'600', transition:'all 0.2s' }}>
+              <span style={{ fontSize:'16px' }}>{dark ? '☀️' : '🌙'}</span>
+              {dark ? 'Light Mode' : 'Dark Mode'}
+            </button>
+            {/* Made by Prateek */}
+            <div style={{ background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.25)', borderRadius:'9px', padding:'8px 16px', display:'flex', alignItems:'center', gap:'8px' }}>
+              <span style={{ fontSize:'18px' }}>✦</span>
+              <div>
+                <div style={{ color:'#fbbf24', fontWeight:'700', fontSize:'13px' }}>Made by Prateek</div>
+                <div style={{ color:C.headerMuted, fontSize:'11px' }}>Payments Domain · BA Reference 2025</div>
+              </div>
             </div>
           </div>
         </div>
-        <div style={{ display:'flex', gap:'4px', flexWrap:'wrap' }}>
+        <div style={{ display:'flex', gap:'5px', flexWrap:'wrap' }}>
           {TABS.map((t,i) => (
-            <button key={i} onClick={() => setTab(i)} style={{ padding:'7px 13px', borderRadius:'7px', fontSize:'12px', cursor:'pointer', transition:'all 0.15s', border: tab===i ? `1px solid ${C.cyan}50` : `1px solid ${C.border}`, background: tab===i ? `${C.cyan}14` : 'transparent', color: tab===i ? C.cyan : C.muted, fontWeight: tab===i ? '600' : '400' }}>{t}</button>
+            <button key={i} onClick={() => setTab(i)} style={{ padding:'8px 14px', borderRadius:'8px', fontSize:'12.5px', cursor:'pointer', transition:'all 0.15s', border: tab===i ? `1px solid ${C.tabBorder}` : `1px solid ${C.tabInactiveBorder}`, background: tab===i ? C.tabActiveBg : 'transparent', color: tab===i ? C.tabActive : C.tabInactive, fontWeight: tab===i ? '700' : '400' }}>{t}</button>
           ))}
         </div>
       </div>
 
-      <div style={{ padding:'24px 28px', maxWidth:'1400px', margin:'0 auto' }}>
+      <div style={{ padding:'26px 28px', maxWidth:'1400px', margin:'0 auto' }}>
 
-        {/* ═══════════════════════════════════════════════
-            TAB 0 — DOMAIN TREE
-        ═══════════════════════════════════════════════ */}
+        {/* ═══ TAB 0 — DOMAIN TREE ═══ */}
         {tab===0 && (() => {
           const filterTree = (node, q) => {
             if (!q) return node;
@@ -404,27 +464,25 @@ export default function App() {
           const filtered = filterTree(domainTree, searchQuery);
           return (
             <SectionCard title="FULL PAYMENTS DOMAIN TREE" color={C.gold} icon="🌐">
-              <div style={{ display:'flex', gap:'10px', alignItems:'center', marginBottom:'14px', flexWrap:'wrap' }}>
+              <div style={{ display:'flex', gap:'10px', alignItems:'center', marginBottom:'15px', flexWrap:'wrap' }}>
                 <input placeholder="🔍  Search… (e.g. UPI, chargeback, tokenization, NEFT, ACS)" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                  style={{ flex:1, minWidth:'220px', padding:'9px 14px', background:'#0a1020', border:`1px solid ${searchQuery ? C.gold+'60' : C.border}`, borderRadius:'7px', color:C.text, fontSize:'12.5px', outline:'none' }} />
-                {searchQuery && <button onClick={() => setSearchQuery('')} style={{ padding:'8px 14px', borderRadius:'6px', background:`${C.gold}12`, border:`1px solid ${C.gold}30`, color:C.gold, fontSize:'12px', cursor:'pointer' }}>✕ Clear</button>}
+                  style={{ flex:1, minWidth:'220px', padding:'10px 15px', background:C.inputBg, border:`1.5px solid ${searchQuery ? C.gold+'70' : C.border}`, borderRadius:'8px', color:C.text, fontSize:'13.5px', outline:'none', transition:'border 0.2s' }} />
+                {searchQuery && <button onClick={() => setSearchQuery('')} style={{ padding:'9px 15px', borderRadius:'7px', background:`${C.gold}15`, border:`1px solid ${C.gold}35`, color:C.gold, fontSize:'13px', cursor:'pointer', fontWeight:'600' }}>✕ Clear</button>}
               </div>
-              <p style={{ color:C.muted, fontSize:'11.5px', margin:'0 0 14px' }}>Click <strong style={{ color:C.gold }}>▶</strong> to expand · All 13 players, 8 instrument types, 6 rails, 5 gateway layers, security, settlement, and emerging tech</p>
-              {filtered ? <TreeNode node={filtered} depth={0} /> : <div style={{ color:C.muted, textAlign:'center', padding:'24px' }}>No results for "{searchQuery}"</div>}
+              <p style={{ color:C.muted, fontSize:'13px', margin:'0 0 15px' }}>Click <strong style={{ color:C.gold }}>▶</strong> to expand · All 13 players, 8 instrument types, 6 rails, 5 gateway layers, security, settlement, and emerging tech</p>
+              {filtered ? <TreeNode node={filtered} depth={0} /> : <div style={{ color:C.muted, textAlign:'center', padding:'26px', fontSize:'14px' }}>No results for "{searchQuery}"</div>}
             </SectionCard>
           );
         })()}
 
-        {/* ═══════════════════════════════════════════════
-            TAB 1 — ECOSYSTEM & PAYMENT TYPES
-        ═══════════════════════════════════════════════ */}
+        {/* ═══ TAB 1 — ECOSYSTEM & TYPES ═══ */}
         {tab===1 && (
           <div>
-            <h2 style={{ color:C.gold, margin:'0 0 4px', fontSize:'18px' }}>👥 Ecosystem Players & Payment Classification</h2>
-            <p style={{ color:C.muted, fontSize:'12px', marginBottom:'20px' }}>Every actor in the payment chain with their role, function, and examples — plus complete payment type taxonomy</p>
+            <h2 style={{ color:C.gold, margin:'0 0 5px', fontSize:'20px' }}>👥 Ecosystem Players & Payment Classification</h2>
+            <p style={{ color:C.muted, fontSize:'14px', marginBottom:'22px' }}>Every actor in the payment chain with their role, function, and examples — plus complete payment type taxonomy</p>
 
             <SectionCard title="COMPLETE ECOSYSTEM — ALL 14 PLAYERS" color={C.cyan} icon="👥">
-              <p style={{ color:C.muted, fontSize:'12px', marginBottom:'12px' }}>Every payment involves a coordinated chain of actors. A BA must know every role cold — who is responsible for what, who holds money, and who is regulated.</p>
+              <p style={{ color:C.muted, fontSize:'13.5px', marginBottom:'14px' }}>Every payment involves a coordinated chain of actors. A BA must know every role cold — who is responsible for what, who holds money, and who is regulated.</p>
               <RichTable
                 headers={['Player','Role Label','What They Do','India Examples','Key BA Relevance']}
                 colColors={[C.cyan, C.gold, null, null, C.teal]}
@@ -449,10 +507,9 @@ export default function App() {
             </SectionCard>
 
             <SectionCard title="PAYMENT TYPES — COMPLETE CLASSIFICATION" color={C.gold} icon="📂">
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:'14px' }}>
-                {/* By Instrument */}
-                <div style={{ background:`${C.cyan}07`, border:`1px solid ${C.cyan}20`, borderRadius:'10px', padding:'16px' }}>
-                  <div style={{ color:C.cyan, fontWeight:'700', fontSize:'13px', marginBottom:'12px' }}>💳 By Instrument</div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:'15px' }}>
+                <div style={{ background:`${C.cyan}08`, border:`1px solid ${C.cyan}22`, borderRadius:'11px', padding:'18px' }}>
+                  <div style={{ color:C.cyan, fontWeight:'700', fontSize:'14px', marginBottom:'13px' }}>💳 By Instrument</div>
                   <RichTable headers={['Instrument','Type','MDR','Speed']} colColors={[C.cyan]}
                     rows={[
                       ['Credit Card','Post-paid revolving','1.5–3%','Auth instant; settle T+1–T+3'],
@@ -466,9 +523,8 @@ export default function App() {
                     ]}
                   />
                 </div>
-                {/* By Nature */}
-                <div style={{ background:`${C.gold}07`, border:`1px solid ${C.gold}20`, borderRadius:'10px', padding:'16px' }}>
-                  <div style={{ color:C.gold, fontWeight:'700', fontSize:'13px', marginBottom:'12px' }}>🔄 By Nature of Transaction</div>
+                <div style={{ background:`${C.gold}08`, border:`1px solid ${C.gold}22`, borderRadius:'11px', padding:'18px' }}>
+                  <div style={{ color:C.gold, fontWeight:'700', fontSize:'14px', marginBottom:'13px' }}>🔄 By Nature of Transaction</div>
                   {[
                     { type:'P2P', full:'Person to Person', eg:'UPI transfers, wallet-to-wallet, IMPS, friend payments', color:C.cyan },
                     { type:'P2M', full:'Person to Merchant', eg:'Swiggy, retail POS, eCommerce checkout — most common by volume', color:C.green },
@@ -477,18 +533,17 @@ export default function App() {
                     { type:'P2G', full:'Person to Government', eg:'Tax payments, challans, license fees via BBPS/Net Banking', color:C.purple },
                     { type:'C2B', full:'Consumer to Business', eg:'Utility bills, EMI collection, SaaS subscriptions', color:C.teal },
                   ].map((r,i) => (
-                    <div key={i} style={{ display:'flex', gap:'10px', padding:'8px 10px', marginBottom:'5px', background:`${r.color}08`, border:`1px solid ${r.color}18`, borderRadius:'6px' }}>
-                      <span style={{ color:r.color, fontWeight:'800', fontSize:'13px', minWidth:'30px' }}>{r.type}</span>
+                    <div key={i} style={{ display:'flex', gap:'10px', padding:'9px 11px', marginBottom:'6px', background:`${r.color}09`, border:`1px solid ${r.color}20`, borderRadius:'7px' }}>
+                      <span style={{ color:r.color, fontWeight:'800', fontSize:'14px', minWidth:'32px' }}>{r.type}</span>
                       <div>
-                        <div style={{ color:'#e0e8ff', fontWeight:'600', fontSize:'12px' }}>{r.full}</div>
-                        <div style={{ color:C.muted, fontSize:'11px' }}>{r.eg}</div>
+                        <div style={{ color:C.text, fontWeight:'600', fontSize:'13px' }}>{r.full}</div>
+                        <div style={{ color:C.muted, fontSize:'12.5px' }}>{r.eg}</div>
                       </div>
                     </div>
                   ))}
                 </div>
-                {/* By Channel */}
-                <div style={{ background:`${C.teal}07`, border:`1px solid ${C.teal}20`, borderRadius:'10px', padding:'16px' }}>
-                  <div style={{ color:C.teal, fontWeight:'700', fontSize:'13px', marginBottom:'12px' }}>📍 By Channel</div>
+                <div style={{ background:`${C.teal}08`, border:`1px solid ${C.teal}22`, borderRadius:'11px', padding:'18px' }}>
+                  <div style={{ color:C.teal, fontWeight:'700', fontSize:'14px', marginBottom:'13px' }}>📍 By Channel</div>
                   {[
                     { ch:'POS Terminal', def:'Card swipe/dip/tap at physical store (Card Present)', risk:'Lower — card physically present' },
                     { ch:'eCommerce / CNP', def:'Online checkout — Card Not Present; 3DS2 mandatory India', risk:'Higher — 3DS required' },
@@ -499,24 +554,23 @@ export default function App() {
                     { ch:'Micro ATM / BC', def:'Card swipe at Business Correspondent agent outlet', risk:'AePS biometric auth' },
                     { ch:'BBPS', def:'Bharat Bill Payment System — utility bills, insurance, telecom', risk:'Standardized receipt' },
                   ].map((c,i) => (
-                    <div key={i} style={{ padding:'7px 10px', marginBottom:'5px', background:`${C.teal}06`, borderRadius:'5px', borderLeft:`3px solid ${C.teal}40` }}>
-                      <span style={{ color:C.teal, fontWeight:'600', fontSize:'12px' }}>{c.ch} </span>
-                      <span style={{ color:'#b0c4de', fontSize:'11.5px' }}>— {c.def}</span>
+                    <div key={i} style={{ padding:'8px 11px', marginBottom:'5px', background:`${C.teal}07`, borderRadius:'6px', borderLeft:`3px solid ${C.teal}45` }}>
+                      <span style={{ color:C.teal, fontWeight:'600', fontSize:'13px' }}>{c.ch} </span>
+                      <span style={{ color:C.body, fontSize:'12.5px' }}>— {c.def}</span>
                     </div>
                   ))}
                 </div>
-                {/* By Settlement Pattern */}
-                <div style={{ background:`${C.purple}07`, border:`1px solid ${C.purple}20`, borderRadius:'10px', padding:'16px' }}>
-                  <div style={{ color:C.purple, fontWeight:'700', fontSize:'13px', marginBottom:'12px' }}>🔀 By Settlement Pattern</div>
-                  <div style={{ marginBottom:'12px', padding:'12px', background:`${C.purple}08`, borderRadius:'8px' }}>
-                    <div style={{ color:C.purple, fontWeight:'700', fontSize:'12px', marginBottom:'6px' }}>Credit-Push (Sender Initiates)</div>
-                    <div style={{ color:'#b0c4de', fontSize:'12px' }}>Sender pushes money to receiver — payer initiates the transaction</div>
-                    <div style={{ color:C.muted, fontSize:'11.5px', marginTop:'4px' }}>Examples: UPI Pay, NEFT, RTGS, IMPS — "I am sending ₹X to you"</div>
+                <div style={{ background:`${C.purple}08`, border:`1px solid ${C.purple}22`, borderRadius:'11px', padding:'18px' }}>
+                  <div style={{ color:C.purple, fontWeight:'700', fontSize:'14px', marginBottom:'13px' }}>🔀 By Settlement Pattern</div>
+                  <div style={{ marginBottom:'13px', padding:'13px', background:`${C.purple}09`, borderRadius:'9px' }}>
+                    <div style={{ color:C.purple, fontWeight:'700', fontSize:'13px', marginBottom:'7px' }}>Credit-Push (Sender Initiates)</div>
+                    <div style={{ color:C.body, fontSize:'13px' }}>Sender pushes money to receiver — payer initiates the transaction</div>
+                    <div style={{ color:C.muted, fontSize:'12.5px', marginTop:'5px' }}>Examples: UPI Pay, NEFT, RTGS, IMPS — "I am sending ₹X to you"</div>
                   </div>
-                  <div style={{ padding:'12px', background:`${C.orange}08`, borderRadius:'8px', border:`1px solid ${C.orange}18` }}>
-                    <div style={{ color:C.orange, fontWeight:'700', fontSize:'12px', marginBottom:'6px' }}>Debit-Pull (Receiver Initiates)</div>
-                    <div style={{ color:'#b0c4de', fontSize:'12px' }}>Receiver pulls money from payer — payee initiates the transaction</div>
-                    <div style={{ color:C.muted, fontSize:'11.5px', marginTop:'4px' }}>Examples: Card payment, NACH mandate, UPI Collect — "I am collecting ₹X from you"</div>
+                  <div style={{ padding:'13px', background:`${C.orange}09`, borderRadius:'9px', border:`1px solid ${C.orange}20` }}>
+                    <div style={{ color:C.orange, fontWeight:'700', fontSize:'13px', marginBottom:'7px' }}>Debit-Pull (Receiver Initiates)</div>
+                    <div style={{ color:C.body, fontSize:'13px' }}>Receiver pulls money from payer — payee initiates the transaction</div>
+                    <div style={{ color:C.muted, fontSize:'12.5px', marginTop:'5px' }}>Examples: Card payment, NACH mandate, UPI Collect — "I am collecting ₹X from you"</div>
                   </div>
                   <BANote text="This distinction is critical for BRD design — Pull-based systems require mandate/consent frameworks and different dispute handling than push-based ones." color={C.purple} />
                 </div>
@@ -525,13 +579,11 @@ export default function App() {
           </div>
         )}
 
-        {/* ═══════════════════════════════════════════════
-            TAB 2 — INDIA RAILS
-        ═══════════════════════════════════════════════ */}
+        {/* ═══ TAB 2 — INDIA RAILS ═══ */}
         {tab===2 && (
           <div>
-            <h2 style={{ color:C.gold, margin:'0 0 4px', fontSize:'18px' }}>🚆 India Payment Rails — Complete Deep Dive</h2>
-            <p style={{ color:C.muted, fontSize:'12px', marginBottom:'20px' }}>Every infrastructure rail India runs on — operated by RBI & NPCI. A rail is the underlying settlement & routing infrastructure a payment travels through.</p>
+            <h2 style={{ color:C.gold, margin:'0 0 5px', fontSize:'20px' }}>🚆 India Payment Rails — Complete Deep Dive</h2>
+            <p style={{ color:C.muted, fontSize:'14px', marginBottom:'22px' }}>Every infrastructure rail India runs on — operated by RBI & NPCI. A rail is the underlying settlement & routing infrastructure a payment travels through.</p>
 
             <SectionCard title="ALL 6 INDIA RAILS — FULL COMPARISON TABLE" color={C.cyan} icon="📊">
               <RichTable
@@ -548,18 +600,18 @@ export default function App() {
               />
             </SectionCard>
 
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))', gap:'14px' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))', gap:'15px' }}>
               <SectionCard title="KEY INSIGHTS FOR BA — RTGS vs NEFT" color={C.gold} icon="💡">
-                <div style={{ display:'flex', gap:'10px', marginBottom:'12px' }}>
-                  <div style={{ flex:1, padding:'12px', background:`${C.gold}08`, border:`1px solid ${C.gold}20`, borderRadius:'8px' }}>
-                    <div style={{ color:C.gold, fontWeight:'700', fontSize:'12.5px', marginBottom:'6px' }}>RTGS — Gross Settlement</div>
-                    <p style={{ color:'#b0c4de', fontSize:'12px', lineHeight:'1.6' }}>Each transaction settled individually and immediately as it arrives. Minimum ₹2 Lakh. Money moves in real-time — no netting, no batching.</p>
-                    <p style={{ color:C.muted, fontSize:'11.5px', marginTop:'6px' }}>Use: High-value corporate transfers, property deals, large B2B invoices</p>
+                <div style={{ display:'flex', gap:'11px', marginBottom:'13px' }}>
+                  <div style={{ flex:1, padding:'13px', background:`${C.gold}09`, border:`1px solid ${C.gold}22`, borderRadius:'9px' }}>
+                    <div style={{ color:C.gold, fontWeight:'700', fontSize:'13.5px', marginBottom:'7px' }}>RTGS — Gross Settlement</div>
+                    <p style={{ color:C.body, fontSize:'13px', lineHeight:'1.65' }}>Each transaction settled individually and immediately as it arrives. Minimum ₹2 Lakh. Money moves in real-time — no netting, no batching.</p>
+                    <p style={{ color:C.muted, fontSize:'12.5px', marginTop:'7px' }}>Use: High-value corporate transfers, property deals, large B2B invoices</p>
                   </div>
-                  <div style={{ flex:1, padding:'12px', background:`${C.cyan}08`, border:`1px solid ${C.cyan}20`, borderRadius:'8px' }}>
-                    <div style={{ color:C.cyan, fontWeight:'700', fontSize:'12.5px', marginBottom:'6px' }}>NEFT — Net Settlement</div>
-                    <p style={{ color:'#b0c4de', fontSize:'12px', lineHeight:'1.6' }}>Multiple transactions are batched and netted into one settlement amount every 30 minutes. A bank that owes ₹10L sends ₹10L net, not 100 individual payments of ₹10K.</p>
-                    <p style={{ color:C.muted, fontSize:'11.5px', marginTop:'6px' }}>Use: Salary disbursement, vendor payments, low-to-mid value transfers</p>
+                  <div style={{ flex:1, padding:'13px', background:`${C.cyan}09`, border:`1px solid ${C.cyan}22`, borderRadius:'9px' }}>
+                    <div style={{ color:C.cyan, fontWeight:'700', fontSize:'13.5px', marginBottom:'7px' }}>NEFT — Net Settlement</div>
+                    <p style={{ color:C.body, fontSize:'13px', lineHeight:'1.65' }}>Multiple transactions are batched and netted into one settlement amount every 30 minutes.</p>
+                    <p style={{ color:C.muted, fontSize:'12.5px', marginTop:'7px' }}>Use: Salary disbursement, vendor payments, low-to-mid value transfers</p>
                   </div>
                 </div>
                 <BANote text="RTGS vs NEFT distinction matters heavily in reconciliation system design. RTGS = one UTR per transaction. NEFT = one UTR for a batch of multiple transactions. Your recon system must handle both patterns." />
@@ -576,16 +628,16 @@ export default function App() {
                   { kpi:'Success Rate Target', val:'> 99% (NPCI mandate for PSP banks)', color:C.green },
                   { kpi:'Settlement cycle', val:'T=0 real-time — instant for both payer and payee', color:C.cyan },
                 ].map((k,i) => (
-                  <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'7px 10px', marginBottom:'4px', background:`${k.color}07`, border:`1px solid ${k.color}15`, borderRadius:'5px' }}>
-                    <span style={{ color:k.color, fontWeight:'600', fontSize:'12px' }}>{k.kpi}</span>
-                    <span style={{ color:'#b0c4de', fontSize:'12px' }}>{k.val}</span>
+                  <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'8px 11px', marginBottom:'5px', background:`${k.color}08`, border:`1px solid ${k.color}18`, borderRadius:'6px' }}>
+                    <span style={{ color:k.color, fontWeight:'600', fontSize:'13px' }}>{k.kpi}</span>
+                    <span style={{ color:C.body, fontSize:'13px' }}>{k.val}</span>
                   </div>
                 ))}
                 <Insight text="Zero MDR on UPI means gateways cannot earn transaction fees on 85% of India's volume. They monetize via SaaS subscriptions, instant settlement premium, payouts API, international transactions, and embedded lending." />
               </SectionCard>
 
               <SectionCard title="NACH / eNACH — RECURRING MANDATE RAILS" color={C.purple} icon="🔁">
-                <p style={{ color:'#b0c4de', fontSize:'12px', lineHeight:'1.6', marginBottom:'12px' }}>NACH (National Automated Clearing House) is the successor to legacy ECS. It enables one-time mandate setup with auto-debit thereafter — critical for any subscription, lending, or insurance product.</p>
+                <p style={{ color:C.body, fontSize:'13px', lineHeight:'1.65', marginBottom:'13px' }}>NACH (National Automated Clearing House) is the successor to legacy ECS. It enables one-time mandate setup with auto-debit thereafter — critical for any subscription, lending, or insurance product.</p>
                 <RichTable headers={['Mandate Type','How Set Up','Debit Trigger','Use Case']} colColors={[C.purple]}
                   rows={[
                     ['Physical NACH','Signed paper mandate submitted to bank','Merchant initiates batch on due date','Legacy EMIs, insurance premiums'],
@@ -597,7 +649,7 @@ export default function App() {
               </SectionCard>
 
               <SectionCard title="AePS — AADHAAR PAYMENT RAIL" color={C.orange} icon="🔐">
-                <p style={{ color:'#b0c4de', fontSize:'12px', lineHeight:'1.6', marginBottom:'12px' }}>AePS (Aadhaar-enabled Payment System) allows banking transactions using just Aadhaar number + biometric fingerprint — no card, no PIN, no smartphone needed. Critical for rural India's financial inclusion.</p>
+                <p style={{ color:C.body, fontSize:'13px', lineHeight:'1.65', marginBottom:'13px' }}>AePS (Aadhaar-enabled Payment System) allows banking transactions using just Aadhaar number + biometric fingerprint — no card, no PIN, no smartphone needed. Critical for rural India's financial inclusion.</p>
                 {[
                   { op:'Cash Withdrawal', def:'Customer withdraws cash via fingerprint at BC agent\'s Micro ATM — ₹10K/txn limit' },
                   { op:'Balance Enquiry', def:'Check bank account balance using Aadhaar + fingerprint only' },
@@ -605,9 +657,9 @@ export default function App() {
                   { op:'Fund Transfer', def:'Transfer funds between Aadhaar-linked accounts — biometric authentication' },
                   { op:'G2P Distribution', def:'Government benefit disbursal — DBT, MGNREGA wages directly to Aadhaar-linked accounts' },
                 ].map((o,i) => (
-                  <div key={i} style={{ padding:'8px 12px', marginBottom:'5px', background:`${C.orange}07`, border:`1px solid ${C.orange}15`, borderRadius:'6px' }}>
-                    <span style={{ color:C.orange, fontWeight:'600', fontSize:'12px' }}>{o.op} — </span>
-                    <span style={{ color:'#b0c4de', fontSize:'12px' }}>{o.def}</span>
+                  <div key={i} style={{ padding:'9px 13px', marginBottom:'6px', background:`${C.orange}08`, border:`1px solid ${C.orange}18`, borderRadius:'7px' }}>
+                    <span style={{ color:C.orange, fontWeight:'600', fontSize:'13px' }}>{o.op} — </span>
+                    <span style={{ color:C.body, fontSize:'13px' }}>{o.def}</span>
                   </div>
                 ))}
                 <BANote text="AePS fraud has increased (fake biometric attacks). New safeguards: liveness detection, limited daily transaction count, Aadhaar biometric lock feature. BA must include these controls in any AePS integration BRD." color={C.orange} />
@@ -616,19 +668,15 @@ export default function App() {
           </div>
         )}
 
-        {/* ═══════════════════════════════════════════════
-            TAB 3 — CARD LIFECYCLE
-        ═══════════════════════════════════════════════ */}
+        {/* ═══ TAB 3 — CARD LIFECYCLE ═══ */}
         {tab===3 && (
           <div>
-            <h2 style={{ color:C.gold, margin:'0 0 4px', fontSize:'18px' }}>💳 Card Transaction Lifecycle — 7 Phases</h2>
-            <p style={{ color:C.muted, fontSize:'12px', marginBottom:'20px' }}>Every card payment (debit/credit, online/offline, tap/swipe/chip) follows exactly these 7 phases in this order</p>
-
-            <div style={{ marginBottom:'20px' }}>
+            <h2 style={{ color:C.gold, margin:'0 0 5px', fontSize:'20px' }}>💳 Card Transaction Lifecycle — 7 Phases</h2>
+            <p style={{ color:C.muted, fontSize:'14px', marginBottom:'22px' }}>Every card payment (debit/credit, online/offline, tap/swipe/chip) follows exactly these 7 phases in this order</p>
+            <div style={{ marginBottom:'22px' }}>
               {cardPhases.map((p,i) => <PhaseStep key={i} {...p} connector={i < cardPhases.length-1} />)}
             </div>
-
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:'14px' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:'15px' }}>
               <SectionCard title="AUTHORIZATION RESPONSE CODES (ISO 8583)" color={C.orange} icon="🔴">
                 <RichTable headers={['Code','Meaning','Type','BA Action']} colColors={[C.orange]}
                   rows={[
@@ -659,14 +707,14 @@ export default function App() {
               </SectionCard>
 
               <SectionCard title="EMV LIABILITY SHIFT — BA MUST KNOW" color={C.red} icon="⚠️">
-                <p style={{ color:'#b0c4de', fontSize:'12px', lineHeight:'1.6', marginBottom:'12px' }}>EMV = Europay + Mastercard + Visa — the global standard for chip-based card transactions.</p>
-                <div style={{ padding:'12px', background:`${C.red}08`, border:`1px solid ${C.red}25`, borderRadius:'8px', marginBottom:'10px' }}>
-                  <div style={{ color:C.red, fontWeight:'700', fontSize:'12.5px', marginBottom:'6px' }}>Pre-2015: Issuer bore fraud liability</div>
-                  <div style={{ color:'#b0c4de', fontSize:'12px' }}>Banks absorbed all card-present fraud losses regardless of merchant terminal type.</div>
+                <p style={{ color:C.body, fontSize:'13px', lineHeight:'1.65', marginBottom:'13px' }}>EMV = Europay + Mastercard + Visa — the global standard for chip-based card transactions.</p>
+                <div style={{ padding:'13px', background:`${C.red}09`, border:`1px solid ${C.red}28`, borderRadius:'9px', marginBottom:'11px' }}>
+                  <div style={{ color:C.red, fontWeight:'700', fontSize:'13.5px', marginBottom:'7px' }}>Pre-2015: Issuer bore fraud liability</div>
+                  <div style={{ color:C.body, fontSize:'13px' }}>Banks absorbed all card-present fraud losses regardless of merchant terminal type.</div>
                 </div>
-                <div style={{ padding:'12px', background:`${C.green}08`, border:`1px solid ${C.green}25`, borderRadius:'8px' }}>
-                  <div style={{ color:C.green, fontWeight:'700', fontSize:'12.5px', marginBottom:'6px' }}>Post-2015 (EMV Liability Shift): Merchant bears liability if terminal doesn't support EMV chip</div>
-                  <div style={{ color:'#b0c4de', fontSize:'12px' }}>If a fraud transaction occurs on a chip card that was swiped (not dipped) because the POS terminal didn't support chip → liability shifts to merchant/acquirer.</div>
+                <div style={{ padding:'13px', background:`${C.green}09`, border:`1px solid ${C.green}28`, borderRadius:'9px' }}>
+                  <div style={{ color:C.green, fontWeight:'700', fontSize:'13.5px', marginBottom:'7px' }}>Post-2015 (EMV Liability Shift): Merchant bears liability if terminal doesn't support EMV chip</div>
+                  <div style={{ color:C.body, fontSize:'13px' }}>If a fraud transaction occurs on a chip card that was swiped (not dipped) because the POS terminal didn't support chip → liability shifts to merchant/acquirer.</div>
                 </div>
                 <BANote text="When writing requirements for POS terminal upgrades or new merchant onboarding, EMV chip support is a MANDATORY functional requirement — not optional. Include in all POS terminal BRDs." color={C.red} />
               </SectionCard>
@@ -688,13 +736,11 @@ export default function App() {
           </div>
         )}
 
-        {/* ═══════════════════════════════════════════════
-            TAB 4 — UPI DEEP DIVE
-        ═══════════════════════════════════════════════ */}
+        {/* ═══ TAB 4 — UPI DEEP DIVE ═══ */}
         {tab===4 && (
           <div>
-            <h2 style={{ color:C.gold, margin:'0 0 4px', fontSize:'18px' }}>⚡ UPI System — Complete Deep Dive</h2>
-            <p style={{ color:C.muted, fontSize:'12px', marginBottom:'20px' }}>India's crown jewel — 85% of transaction volume · NPCI operated · RBI regulated · Real-time settlement · 24×7</p>
+            <h2 style={{ color:C.gold, margin:'0 0 5px', fontSize:'20px' }}>⚡ UPI System — Complete Deep Dive</h2>
+            <p style={{ color:C.muted, fontSize:'14px', marginBottom:'22px' }}>India's crown jewel — 85% of transaction volume · NPCI operated · RBI regulated · Real-time settlement · 24×7</p>
 
             <SectionCard title="UPI ARCHITECTURE — ALL KEY COMPONENTS" color={C.cyan} icon="🏗">
               <RichTable headers={['Component','Full Name','Role','Examples','Key BA Note']} colColors={[C.cyan, C.gold]}
@@ -710,19 +756,19 @@ export default function App() {
               />
             </SectionCard>
 
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:'14px', marginBottom:'16px' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:'15px', marginBottom:'18px' }}>
               {[
                 { title:'UPI Pay Flow (Push — most common)', color:C.cyan, steps:['Customer scans QR or enters VPA','TPAP shows "Pay ₹X to Merchant" confirmation','Customer enters UPI PIN','PSP Bank → NPCI Switch → Remitter Bank → Beneficiary Bank','T=0 settlement — both credited instantly'] },
                 { title:'UPI Collect Flow (Pull — eCommerce)', color:C.gold, steps:['Merchant generates collect request or dynamic QR','Merchant sends request to customer\'s VPA via NPCI','Customer sees "Approve payment of ₹X" in TPAP app','Customer enters UPI PIN to approve','Credit flows from Remitter → Beneficiary Bank'] },
                 { title:'UPI AutoPay (Mandates)', color:C.purple, steps:['Customer creates mandate: VPA + max cap + frequency','Merchant initiates debit on due date — no customer action','NPCI routes debit request to Remitter Bank','Remitter Bank validates mandate + debits if within cap','2025: AutoPay Portability — move mandates between apps'] },
                 { title:'UPI Lite (Offline)', color:C.green, steps:['Customer pre-loads up to ₹2,000 in on-device wallet','Transaction up to ₹500 per payment, ₹2,000 wallet limit','No internet connection required — NFC-based','No UPI PIN required — faster checkout','Balance stays on device; topped up online when needed'] },
               ].map((f,i) => (
-                <div key={i} style={{ background:`${f.color}07`, border:`1px solid ${f.color}20`, borderRadius:'10px', padding:'16px' }}>
-                  <div style={{ color:f.color, fontWeight:'700', fontSize:'13px', marginBottom:'10px' }}>{f.title}</div>
+                <div key={i} style={{ background:`${f.color}08`, border:`1px solid ${f.color}22`, borderRadius:'11px', padding:'18px' }}>
+                  <div style={{ color:f.color, fontWeight:'700', fontSize:'14px', marginBottom:'11px' }}>{f.title}</div>
                   {f.steps.map((s,j) => (
-                    <div key={j} style={{ display:'flex', gap:'8px', marginBottom:'6px' }}>
-                      <span style={{ color:f.color, fontWeight:'700', fontSize:'11px', minWidth:'16px' }}>{j+1}.</span>
-                      <span style={{ color:'#b0c4de', fontSize:'12px' }}>{s}</span>
+                    <div key={j} style={{ display:'flex', gap:'9px', marginBottom:'7px' }}>
+                      <span style={{ color:f.color, fontWeight:'700', fontSize:'12.5px', minWidth:'18px' }}>{j+1}.</span>
+                      <span style={{ color:C.body, fontSize:'13px' }}>{s}</span>
                     </div>
                   ))}
                 </div>
@@ -745,7 +791,7 @@ export default function App() {
             </SectionCard>
 
             <SectionCard title="UPI 2025–2026 NEW FEATURES" color={C.teal} icon="🆕">
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(260px, 1fr))', gap:'10px' }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(260px, 1fr))', gap:'11px' }}>
                 {[
                   { name:'Biometric Authentication (2025)', color:C.green, def:'Fingerprint/face ID replaces UPI PIN for transactions up to ₹5,000. Faster checkout, no PIN memorization.', ba:'Define biometric fallback flow (PIN) when biometric fails or is not set up.' },
                   { name:'UPI Reserve Pay (2025)', color:C.gold, def:'Block up to ₹10,000 for 90 days for multiple future payments. Works like a time-locked balance earmark.', ba:'Define reserve creation API, release triggers, partial-use logic, and expiry handling.' },
@@ -756,10 +802,10 @@ export default function App() {
                   { name:'Multi-Signatory Accounts', color:C.teal, def:'Joint/business accounts with multi-approval flows. Multiple users must approve before payment processes — like corporate maker-checker in UPI.', ba:'Define approval chain design, timeout handling when approver doesn\'t act, and notification flows.' },
                   { name:'UPI Limits Tightening (Aug 2025)', color:C.red, def:'Balance checks limited to 50 per day; account view limited to 25 per day. RBI curbing excessive balance-check API calls.', ba:'Product must redesign any feature that relied on frequent balance polling — add caching or user-initiated checks only.' },
                 ].map((f,i) => (
-                  <div key={i} style={{ padding:'14px', background:`${f.color}07`, border:`1px solid ${f.color}22`, borderRadius:'9px' }}>
-                    <div style={{ color:f.color, fontWeight:'700', fontSize:'12.5px', marginBottom:'6px' }}>{f.name}</div>
-                    <div style={{ color:'#b0c4de', fontSize:'12px', lineHeight:'1.55', marginBottom:'8px' }}>{f.def}</div>
-                    <div style={{ fontSize:'11px', color:f.color, background:`${f.color}10`, padding:'6px 8px', borderRadius:'5px' }}>📌 BA: {f.ba}</div>
+                  <div key={i} style={{ padding:'15px', background:`${f.color}08`, border:`1px solid ${f.color}25`, borderRadius:'10px' }}>
+                    <div style={{ color:f.color, fontWeight:'700', fontSize:'13.5px', marginBottom:'7px' }}>{f.name}</div>
+                    <div style={{ color:C.body, fontSize:'13px', lineHeight:'1.6', marginBottom:'9px' }}>{f.def}</div>
+                    <div style={{ fontSize:'12px', color:f.color, background:`${f.color}12`, padding:'7px 10px', borderRadius:'6px' }}>📌 BA: {f.ba}</div>
                   </div>
                 ))}
               </div>
@@ -767,31 +813,29 @@ export default function App() {
           </div>
         )}
 
-        {/* ═══════════════════════════════════════════════
-            TAB 5 — GATEWAY & TECH
-        ═══════════════════════════════════════════════ */}
+        {/* ═══ TAB 5 — GATEWAY & TECH ═══ */}
         {tab===5 && (
           <div>
-            <h2 style={{ color:C.gold, margin:'0 0 4px', fontSize:'18px' }}>🔌 Payment Gateway Architecture & Technical Deep Dive</h2>
-            <p style={{ color:C.muted, fontSize:'12px', marginBottom:'20px' }}>5-layer gateway stack, key technical concepts, tokenization, failure scenarios — everything a BA needs to write precise requirements</p>
+            <h2 style={{ color:C.gold, margin:'0 0 5px', fontSize:'20px' }}>🔌 Payment Gateway Architecture & Technical Deep Dive</h2>
+            <p style={{ color:C.muted, fontSize:'14px', marginBottom:'22px' }}>5-layer gateway stack, key technical concepts, tokenization, failure scenarios — everything a BA needs to write precise requirements</p>
 
             <SectionCard title="5-LAYER GATEWAY ARCHITECTURE" color={C.cyan} icon="🏗">
               {[
                 { layer:'Layer 1 — Client Layer', color:C.cyan, items:['Web SDK / Mobile SDK — embedded in merchant app/site for card collection','Hosted Checkout Page — merchant redirects to gateway\'s own secure checkout page','Tokenization SDK — captures card data without merchant touching raw PAN (PCI scope reduction)','Static QR / Dynamic QR generation — for UPI P2M flows','Device Fingerprint Collection — browser, OS, screen resolution, timezone for fraud scoring'] },
                 { layer:'Layer 2 — API Layer', color:C.gold, items:['REST APIs over HTTPS/TLS 1.3 — JSON request/response for all operations','Authentication: API Key + Secret OR OAuth 2.0 + JWT tokens','Idempotency Keys — unique UUID per API request; server deduplicates on this key (CRITICAL for retries)','Webhook Endpoints — async result delivery to merchant server via HTTPS POST','Rate Limiting + Throttling — protects gateway from abuse; merchant gets 429 on breach'] },
                 { layer:'Layer 3 — Processing Engine (Core)', color:C.orange, items:['Validation Engine — BIN lookup, card expiry check, Luhn algorithm (mod-10 checksum)','Smart Routing Engine — routes to best acquirer based on BIN, success rate, geography, cost','Fraud/Risk Engine — Rule-based + ML scoring on 100+ signals; outputs Allow/Challenge/Block/Review','Authentication Handler — 3DS2 challenge orchestration, OTP verification, biometric auth handling','Authorization Handler — Sends auth request to acquirer → network → issuer; manages auth response','Pending/Retry/Async State Management — handles timeouts, soft declines, async (UPI/NB) flows'] },
-                { layer:'Layer 4 — External Integrations', color:C.purple, items:['Acquirer Bank connections — ISO 8583 protocol (legacy) or REST API (modern); direct financial messaging','Card Network connections — Visa VisaNet, Mastercard Banknet, RuPay; scheme-specific protocols','UPI Switch (NPCI) — UPI API integration for real-time payment initiation and confirmation','Wallet Providers (Paytm, PhonePe, Amazon Pay) — wallet API for balance check and debit','NACH Gateway (NPCI) — mandate registration, modification, execution, cancellation','CBs / Core Banking — for nodal account management, settlement fund movement'] },
-                { layer:'Layer 5 — Post-Processing Layer', color:C.teal, items:['Settlement Engine — calculates net amounts (gross - MDR - rolling reserve); schedules fund movement','Reconciliation Engine — downloads settlement files, matches against internal ledger, flags exceptions','Ledger System — double-entry accounting; immutable append-only journal entries','Reporting Engine — merchant dashboards, MIS reports, settlement reports, chargeback reports','Dispute Management System — chargeback workflow, evidence upload, representment tracking','Merchant Analytics — auth rate, success rate, top decline reasons, method mix reporting'] },
+                { layer:'Layer 4 — External Integrations', color:C.purple, items:['Acquirer Bank connections — ISO 8583 protocol (legacy) or REST API (modern); direct financial messaging','Card Network connections — Visa VisaNet, Mastercard Banknet, RuPay; scheme-specific protocols','UPI Switch (NPCI) — UPI API integration for real-time payment initiation and confirmation','Wallet Providers (Paytm, PhonePe, Amazon Pay) — wallet API for balance check and debit','NACH Gateway (NPCI) — mandate registration, modification, execution, cancellation'] },
+                { layer:'Layer 5 — Post-Processing Layer', color:C.teal, items:['Settlement Engine — calculates net amounts (gross - MDR - rolling reserve); schedules fund movement','Reconciliation Engine — downloads settlement files, matches against internal ledger, flags exceptions','Ledger System — double-entry accounting; immutable append-only journal entries','Reporting Engine — merchant dashboards, MIS reports, settlement reports, chargeback reports','Dispute Management System — chargeback workflow, evidence upload, representment tracking'] },
               ].map((l,i) => (
-                <div key={i} style={{ display:'flex', gap:'0', marginBottom:'8px' }}>
-                  <div style={{ width:'56px', flexShrink:0, background:`${l.color}15`, border:`1px solid ${l.color}30`, borderRadius:'8px 0 0 8px', display:'flex', alignItems:'center', justifyContent:'center', padding:'8px', writingMode:'vertical-rl', textOrientation:'mixed', transform:'rotate(180deg)' }}>
-                    <span style={{ color:l.color, fontWeight:'700', fontSize:'10.5px', whiteSpace:'nowrap' }}>L{i+1}</span>
+                <div key={i} style={{ display:'flex', gap:'0', marginBottom:'9px' }}>
+                  <div style={{ width:'58px', flexShrink:0, background:`${l.color}16`, border:`1px solid ${l.color}32`, borderRadius:'9px 0 0 9px', display:'flex', alignItems:'center', justifyContent:'center', padding:'9px', writingMode:'vertical-rl', textOrientation:'mixed', transform:'rotate(180deg)' }}>
+                    <span style={{ color:l.color, fontWeight:'700', fontSize:'11.5px', whiteSpace:'nowrap' }}>L{i+1}</span>
                   </div>
-                  <div style={{ flex:1, background:`${l.color}05`, border:`1px solid ${l.color}18`, borderLeft:'none', borderRadius:'0 8px 8px 0', padding:'14px 16px' }}>
-                    <div style={{ color:l.color, fontWeight:'700', fontSize:'13px', marginBottom:'8px' }}>{l.layer}</div>
-                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(260px, 1fr))', gap:'4px' }}>
+                  <div style={{ flex:1, background:`${l.color}06`, border:`1px solid ${l.color}20`, borderLeft:'none', borderRadius:'0 9px 9px 0', padding:'15px 18px' }}>
+                    <div style={{ color:l.color, fontWeight:'700', fontSize:'14px', marginBottom:'9px' }}>{l.layer}</div>
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(270px, 1fr))', gap:'5px' }}>
                       {l.items.map((item,j) => (
-                        <div key={j} style={{ color:'#b0c4de', fontSize:'12px', paddingLeft:'12px', borderLeft:`2px solid ${l.color}30` }}>{item}</div>
+                        <div key={j} style={{ color:C.body, fontSize:'13px', paddingLeft:'13px', borderLeft:`2px solid ${l.color}35` }}>{item}</div>
                       ))}
                     </div>
                   </div>
@@ -808,7 +852,7 @@ export default function App() {
                   ['Webhook','Real-time HTTPS POST notification from gateway to merchant when event occurs','BA must specify: events to subscribe to, response SLA, retry config, idempotency via event_id, dead-letter queue'],
                   ['Retry Logic','Auto-reattempt failed transactions with exponential backoff','Define: max attempts, backoff interval (e.g. 1s → 2s → 4s → 8s), which error codes are retryable'],
                   ['Circuit Breaker','Stops cascading failures when a downstream dependency is consistently down','NFR requirement: gateway must stop routing to a failing acquirer after N consecutive failures; auto-recover when healthy'],
-                  ['Message Queue','Kafka/RabbitMQ for async transaction processing and event streaming','High-volume systems: payment events → queue → consumers (ledger, settlement, notification); define consumer SLAs'],
+                  ['Message Queue','Kafka/RabbitMQ for async transaction processing and event streaming','High-volume systems: payment events → queue → consumers (ledger, settlement, notification)'],
                   ['TLS Encryption','Transport-layer encryption for data in transit (TLS 1.3 minimum)','PCI DSS requirement: all cardholder data in transit must use TLS 1.3+; BA specifies as NFR'],
                   ['AES-256 Encryption','Data-at-rest encryption for stored sensitive data','PCI DSS: stored card data must be encrypted with AES-256; key management is separate requirement'],
                   ['Token Vault','Secure store mapping token reference → real card data','Separate from merchant database; tightly access-controlled; audit-logged; encrypted; PCI scope is isolated here'],
@@ -837,32 +881,30 @@ export default function App() {
           </div>
         )}
 
-        {/* ═══════════════════════════════════════════════
-            TAB 6 — USER JOURNEY
-        ═══════════════════════════════════════════════ */}
+        {/* ═══ TAB 6 — USER JOURNEY ═══ */}
         {tab===6 && (
           <div>
-            <h2 style={{ color:C.gold, margin:'0 0 4px', fontSize:'18px' }}>🧭 User Journey + Internal System Events</h2>
-            <p style={{ color:C.muted, fontSize:'12px', marginBottom:'20px' }}>What the customer sees on the left vs what actually happens in the systems on the right — for every payment method</p>
+            <h2 style={{ color:C.gold, margin:'0 0 5px', fontSize:'20px' }}>🧭 User Journey + Internal System Events</h2>
+            <p style={{ color:C.muted, fontSize:'14px', marginBottom:'22px' }}>What the customer sees on the left vs what actually happens in the systems on the right — for every payment method</p>
 
             {Object.entries(journeyData).map(([method, rows]) => {
               const labels = { upi:['⚡ UPI Payment Journey', C.cyan], card:['💳 Online Card Journey', C.purple], netbanking:['🌐 Net Banking Journey', C.green] };
               const [title, color] = labels[method];
               return (
                 <SectionCard key={method} title={title} color={color} icon="">
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'8px' }}>
-                    <div style={{ color:C.muted, fontSize:'11px', textTransform:'uppercase', fontWeight:'600', paddingBottom:'6px', borderBottom:`1px solid ${color}15` }}>👤 Customer Experience</div>
-                    <div style={{ color:C.muted, fontSize:'11px', textTransform:'uppercase', fontWeight:'600', paddingBottom:'6px', borderBottom:`1px solid ${C.gold}15` }}>⚙️ Internal System Events</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'11px', marginBottom:'9px' }}>
+                    <div style={{ color:C.muted, fontSize:'12px', textTransform:'uppercase', fontWeight:'600', paddingBottom:'7px', borderBottom:`1px solid ${color}18` }}>👤 Customer Experience</div>
+                    <div style={{ color:C.muted, fontSize:'12px', textTransform:'uppercase', fontWeight:'600', paddingBottom:'7px', borderBottom:`1px solid ${C.gold}18` }}>⚙️ Internal System Events</div>
                   </div>
                   {rows.map((r,i) => (
-                    <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'6px' }}>
-                      <div style={{ display:'flex', gap:'8px', padding:'9px 12px', background:`${color}07`, border:`1px solid ${color}15`, borderRadius:'7px' }}>
-                        <span style={{ width:'20px', height:'20px', borderRadius:'50%', background:`${color}18`, border:`1px solid ${color}`, display:'flex', alignItems:'center', justifyContent:'center', color, fontSize:'10px', fontWeight:'700', flexShrink:0 }}>{i+1}</span>
-                        <span style={{ color:'#c0d0e8', fontSize:'12px' }}>{r.user}</span>
+                    <div key={i} style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'11px', marginBottom:'7px' }}>
+                      <div style={{ display:'flex', gap:'9px', padding:'10px 13px', background:`${color}08`, border:`1px solid ${color}18`, borderRadius:'8px' }}>
+                        <span style={{ width:'22px', height:'22px', borderRadius:'50%', background:`${color}20`, border:`1px solid ${color}`, display:'flex', alignItems:'center', justifyContent:'center', color, fontSize:'11px', fontWeight:'700', flexShrink:0 }}>{i+1}</span>
+                        <span style={{ color:C.body, fontSize:'13px' }}>{r.user}</span>
                       </div>
-                      <div style={{ display:'flex', gap:'8px', padding:'9px 12px', background:`${C.gold}07`, border:`1px solid ${C.gold}15`, borderRadius:'7px' }}>
-                        <span style={{ width:'20px', height:'20px', borderRadius:'50%', background:`${C.gold}18`, border:`1px solid ${C.gold}`, display:'flex', alignItems:'center', justifyContent:'center', color:C.gold, fontSize:'10px', fontWeight:'700', flexShrink:0 }}>{i+1}</span>
-                        <span style={{ color:'#c0d0e8', fontSize:'12px' }}>{r.internal}</span>
+                      <div style={{ display:'flex', gap:'9px', padding:'10px 13px', background:`${C.gold}08`, border:`1px solid ${C.gold}18`, borderRadius:'8px' }}>
+                        <span style={{ width:'22px', height:'22px', borderRadius:'50%', background:`${C.gold}20`, border:`1px solid ${C.gold}`, display:'flex', alignItems:'center', justifyContent:'center', color:C.gold, fontSize:'11px', fontWeight:'700', flexShrink:0 }}>{i+1}</span>
+                        <span style={{ color:C.body, fontSize:'13px' }}>{r.internal}</span>
                       </div>
                     </div>
                   ))}
@@ -880,34 +922,32 @@ export default function App() {
                 { label:'SETTLEMENT', color:C.orange, items:['Actual money: Issuer → Network → Acquirer → Merchant bank', 'T+1/T+2/T+3 for cards | T=0 for UPI | MDR deducted at each step'] },
                 { label:'RECONCILIATION', color:C.pink, items:['All independent systems verify records match', 'Exceptions flagged: short-settle, duplicates, missing; MDR split verified'] },
               ].map((stage,i) => (
-                <div key={i} style={{ display:'flex', gap:'0', marginBottom:'5px' }}>
-                  <div style={{ width:'130px', flexShrink:0, background:`${stage.color}14`, border:`1px solid ${stage.color}30`, borderRadius: i===0?'8px 0 0 8px':i===6?'0 0 0 8px':'0 0 0 0', display:'flex', alignItems:'center', justifyContent:'center', padding:'10px' }}>
-                    <span style={{ color:stage.color, fontWeight:'700', fontSize:'12px', textAlign:'center' }}>{stage.label}</span>
+                <div key={i} style={{ display:'flex', gap:'0', marginBottom:'6px' }}>
+                  <div style={{ width:'140px', flexShrink:0, background:`${stage.color}15`, border:`1px solid ${stage.color}32`, borderRadius:'9px 0 0 9px', display:'flex', alignItems:'center', justifyContent:'center', padding:'11px' }}>
+                    <span style={{ color:stage.color, fontWeight:'700', fontSize:'13px', textAlign:'center' }}>{stage.label}</span>
                   </div>
-                  <div style={{ flex:1, background:`${stage.color}06`, border:`1px solid ${stage.color}18`, borderLeft:'none', borderRadius: i===0?'0 8px 8px 0':i===6?'0 8px 8px 0':'0 8px 8px 0', padding:'10px 14px' }}>
+                  <div style={{ flex:1, background:`${stage.color}07`, border:`1px solid ${stage.color}20`, borderLeft:'none', borderRadius:'0 9px 9px 0', padding:'11px 15px' }}>
                     {stage.items.map((item,j) => (
-                      <div key={j} style={{ color:'#b8c8e0', fontSize:'12px', display:'flex', gap:'6px' }}>
+                      <div key={j} style={{ color:C.body, fontSize:'13px', display:'flex', gap:'7px' }}>
                         <span style={{ color:stage.color }}>›</span>{item}
                       </div>
                     ))}
                   </div>
                 </div>
               ))}
-              <div style={{ marginTop:'12px', padding:'14px', background:`${C.orange}07`, border:`1px solid ${C.orange}20`, borderRadius:'8px' }}>
-                <div style={{ color:C.orange, fontWeight:'700', marginBottom:'8px', fontSize:'13px' }}>⚠️ EXCEPTION PATH — Dispute & Chargeback</div>
+              <div style={{ marginTop:'13px', padding:'15px', background:`${C.orange}08`, border:`1px solid ${C.orange}22`, borderRadius:'9px' }}>
+                <div style={{ color:C.orange, fontWeight:'700', marginBottom:'9px', fontSize:'14px' }}>⚠️ EXCEPTION PATH — Dispute & Chargeback</div>
                 <FlowRow color={C.orange} steps={['Customer Dispute','Retrieval Request','Chargeback (funds reversed)','Representment (merchant evidence)','Pre-Arbitration','Final Arbitration (Network)']} />
               </div>
             </SectionCard>
           </div>
         )}
 
-        {/* ═══════════════════════════════════════════════
-            TAB 7 — RISK & DISPUTES
-        ═══════════════════════════════════════════════ */}
+        {/* ═══ TAB 7 — RISK & DISPUTES ═══ */}
         {tab===7 && (
           <div>
-            <h2 style={{ color:C.gold, margin:'0 0 4px', fontSize:'18px' }}>⚖️ Risk, Fraud & Disputes — Full Deep Dive</h2>
-            <p style={{ color:C.muted, fontSize:'12px', marginBottom:'20px' }}>8 fraud types, risk engine architecture with all signal layers, chargeback lifecycle, reason codes, reconciliation types</p>
+            <h2 style={{ color:C.gold, margin:'0 0 5px', fontSize:'20px' }}>⚖️ Risk, Fraud & Disputes — Full Deep Dive</h2>
+            <p style={{ color:C.muted, fontSize:'14px', marginBottom:'22px' }}>8 fraud types, risk engine architecture with all signal layers, chargeback lifecycle, reason codes, reconciliation types</p>
 
             <SectionCard title="FRAUD TYPES — ALL 9 CATEGORIES" color={C.orange} icon="🚨">
               <RichTable headers={['Fraud Type','Description','Detection Signal','BA Defense Requirement']} colColors={[C.orange]}
@@ -925,10 +965,10 @@ export default function App() {
               />
             </SectionCard>
 
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'16px' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'15px', marginBottom:'18px' }}>
               <SectionCard title="RISK ENGINE — SIGNAL LAYERS" color={C.red} icon="🔍">
-                <div style={{ marginBottom:'12px' }}>
-                  <div style={{ color:C.cyan, fontWeight:'700', fontSize:'12.5px', marginBottom:'8px' }}>Input Signals (100+)</div>
+                <div style={{ marginBottom:'13px' }}>
+                  <div style={{ color:C.cyan, fontWeight:'700', fontSize:'13.5px', marginBottom:'9px' }}>Input Signals (100+)</div>
                   {[
                     'Transaction amount + currency',
                     'Device fingerprint (browser, OS, screen resolution, timezone)',
@@ -940,32 +980,32 @@ export default function App() {
                     'Merchant MCC risk score',
                     'Historical transaction patterns for this card/customer',
                     'Previous chargeback history on this card',
-                  ].map((s,i) => <div key={i} style={{ color:'#b0c4de', fontSize:'11.5px', padding:'3px 0 3px 10px', borderLeft:`2px solid ${C.cyan}30`, marginBottom:'2px' }}>— {s}</div>)}
+                  ].map((s,i) => <div key={i} style={{ color:C.body, fontSize:'13px', padding:'4px 0 4px 12px', borderLeft:`2px solid ${C.cyan}32`, marginBottom:'3px' }}>— {s}</div>)}
                 </div>
-                <div style={{ marginBottom:'10px' }}>
-                  <div style={{ color:C.gold, fontWeight:'700', fontSize:'12.5px', marginBottom:'8px' }}>Logic Layers (3 tiers)</div>
+                <div style={{ marginBottom:'11px' }}>
+                  <div style={{ color:C.gold, fontWeight:'700', fontSize:'13.5px', marginBottom:'9px' }}>Logic Layers (3 tiers)</div>
                   {[
                     { tier:'Hard Rules', rule:'IF amount > ₹50K AND BIN country ≠ IP country AND new device → BLOCK', color:C.red },
                     { tier:'Velocity Rules', rule:'IF same card used >3 times in 30 min → REVIEW; >5 times → BLOCK', color:C.orange },
                     { tier:'ML Scoring Model', rule:'Risk score 0–100 computed; score > threshold → Challenge or Block; borderline → Manual Review', color:C.purple },
                   ].map((t,i) => (
-                    <div key={i} style={{ padding:'8px 10px', marginBottom:'5px', background:`${t.color}08`, border:`1px solid ${t.color}20`, borderRadius:'6px' }}>
-                      <div style={{ color:t.color, fontWeight:'600', fontSize:'12px' }}>{t.tier}</div>
-                      <div style={{ color:C.muted, fontSize:'11.5px', marginTop:'2px' }}>{t.rule}</div>
+                    <div key={i} style={{ padding:'9px 11px', marginBottom:'6px', background:`${t.color}09`, border:`1px solid ${t.color}22`, borderRadius:'7px' }}>
+                      <div style={{ color:t.color, fontWeight:'600', fontSize:'13px' }}>{t.tier}</div>
+                      <div style={{ color:C.muted, fontSize:'12.5px', marginTop:'3px' }}>{t.rule}</div>
                     </div>
                   ))}
                 </div>
                 <div>
-                  <div style={{ color:C.green, fontWeight:'700', fontSize:'12.5px', marginBottom:'8px' }}>Risk Actions</div>
+                  <div style={{ color:C.green, fontWeight:'700', fontSize:'13.5px', marginBottom:'9px' }}>Risk Actions</div>
                   {[
                     { action:'Allow', desc:'Low risk score → transaction proceeds normally', color:C.green },
                     { action:'Challenge', desc:'Medium risk → trigger 3DS2 OTP step-up authentication', color:C.gold },
                     { action:'Block', desc:'High risk → decline immediately; do not allow retry', color:C.red },
                     { action:'Manual Review', desc:'Borderline score → queue for human fraud analyst review', color:C.orange },
                   ].map((a,i) => (
-                    <div key={i} style={{ display:'flex', gap:'10px', padding:'6px 10px', marginBottom:'4px', background:`${a.color}08`, borderRadius:'5px' }}>
-                      <span style={{ color:a.color, fontWeight:'700', fontSize:'12px', minWidth:'100px' }}>{a.action}</span>
-                      <span style={{ color:'#b0c4de', fontSize:'12px' }}>{a.desc}</span>
+                    <div key={i} style={{ display:'flex', gap:'11px', padding:'7px 11px', marginBottom:'5px', background:`${a.color}09`, borderRadius:'6px' }}>
+                      <span style={{ color:a.color, fontWeight:'700', fontSize:'13px', minWidth:'105px' }}>{a.action}</span>
+                      <span style={{ color:C.body, fontSize:'13px' }}>{a.desc}</span>
                     </div>
                   ))}
                 </div>
@@ -981,12 +1021,12 @@ export default function App() {
                     { num:'4', name:'Pre-Arbitration', desc:'Second-cycle: issuer re-disputes if merchant wins representment but issuer still disagrees', timeline:'Post representment' },
                     { num:'5', name:'Arbitration', desc:'Card network (Visa/Mastercard) makes final and binding ruling. Losing party pays ~$500 arbitration fee.', timeline:'Final; ~60–90 days total' },
                   ].map((s,i) => (
-                    <div key={i} style={{ display:'flex', gap:'12px', padding:'10px 12px', marginBottom:'6px', background:`${C.pink}07`, border:`1px solid ${C.pink}18`, borderRadius:'7px' }}>
-                      <div style={{ width:'28px', height:'28px', borderRadius:'50%', background:`${C.pink}20`, border:`1px solid ${C.pink}`, display:'flex', alignItems:'center', justifyContent:'center', color:C.pink, fontWeight:'700', fontSize:'12px', flexShrink:0 }}>{s.num}</div>
+                    <div key={i} style={{ display:'flex', gap:'13px', padding:'11px 13px', marginBottom:'7px', background:`${C.pink}08`, border:`1px solid ${C.pink}20`, borderRadius:'8px' }}>
+                      <div style={{ width:'30px', height:'30px', borderRadius:'50%', background:`${C.pink}22`, border:`1px solid ${C.pink}`, display:'flex', alignItems:'center', justifyContent:'center', color:C.pink, fontWeight:'700', fontSize:'13px', flexShrink:0 }}>{s.num}</div>
                       <div>
-                        <div style={{ color:C.pink, fontWeight:'700', fontSize:'12.5px' }}>{s.name}</div>
-                        <div style={{ color:'#b0c4de', fontSize:'12px', margin:'3px 0' }}>{s.desc}</div>
-                        <div style={{ color:C.muted, fontSize:'11px' }}>⏱ {s.timeline}</div>
+                        <div style={{ color:C.pink, fontWeight:'700', fontSize:'13.5px' }}>{s.name}</div>
+                        <div style={{ color:C.body, fontSize:'13px', margin:'4px 0' }}>{s.desc}</div>
+                        <div style={{ color:C.muted, fontSize:'12px' }}>⏱ {s.timeline}</div>
                       </div>
                     </div>
                   ))}
@@ -1021,8 +1061,8 @@ export default function App() {
                   ['Internal Ledger Reconciliation','Gateway internal double-entry ledger vs Bank statements vs Settlement files','Daily (automated)','Define: automated matching threshold; exception escalation matrix; P1/P2/P3 severity levels'],
                 ]}
               />
-              <div style={{ marginTop:'14px' }}>
-                <div style={{ color:C.teal, fontWeight:'700', fontSize:'13px', marginBottom:'8px' }}>Common Reconciliation Mismatches — Root Causes</div>
+              <div style={{ marginTop:'15px' }}>
+                <div style={{ color:C.teal, fontWeight:'700', fontSize:'14px', marginBottom:'9px' }}>Common Reconciliation Mismatches — Root Causes</div>
                 <RichTable headers={['Mismatch Type','Root Cause','Resolution']} colColors={[C.orange]}
                   rows={[
                     ['Short Settlement','MDR or fee deducted at higher rate than agreed in contract','Raise dispute with acquirer; cross-check fee config table'],
@@ -1040,16 +1080,14 @@ export default function App() {
           </div>
         )}
 
-        {/* ═══════════════════════════════════════════════
-            TAB 8 — LEDGER & FEES
-        ═══════════════════════════════════════════════ */}
+        {/* ═══ TAB 8 — LEDGER & FEES ═══ */}
         {tab===8 && (
           <div>
-            <h2 style={{ color:C.gold, margin:'0 0 4px', fontSize:'18px' }}>📒 Ledger, Fees & Merchant Onboarding</h2>
-            <p style={{ color:C.muted, fontSize:'12px', marginBottom:'20px' }}>Double-entry accounting, all fee types, MDR economics, rolling reserve, merchant onboarding lifecycle, nodal accounts</p>
+            <h2 style={{ color:C.gold, margin:'0 0 5px', fontSize:'20px' }}>📒 Ledger, Fees & Merchant Onboarding</h2>
+            <p style={{ color:C.muted, fontSize:'14px', marginBottom:'22px' }}>Double-entry accounting, all fee types, MDR economics, rolling reserve, merchant onboarding lifecycle, nodal accounts</p>
 
             <SectionCard title="DOUBLE-ENTRY LEDGER — EVERY PAYMENT EVENT" color={C.green} icon="📒">
-              <p style={{ color:'#b0c4de', fontSize:'12px', lineHeight:'1.6', marginBottom:'12px' }}>Payments platforms are ledger systems with APIs around them. Every money movement creates balanced debit-credit entries. The ledger is <strong style={{ color:C.green }}>immutable, append-only</strong> — no UPDATEs or DELETEs. Corrections are new entries (reversals), never overwrites.</p>
+              <p style={{ color:C.body, fontSize:'13.5px', lineHeight:'1.65', marginBottom:'13px' }}>Payments platforms are ledger systems with APIs around them. Every money movement creates balanced debit-credit entries. The ledger is <strong style={{ color:C.green }}>immutable, append-only</strong> — no UPDATEs or DELETEs. Corrections are new entries (reversals), never overwrites.</p>
               <RichTable headers={['Event / Trigger','Account Debited','Account Credited','Amount','Why']} colColors={[C.green, C.cyan, C.gold]}
                 rows={[
                   ['1. Customer pays ₹1,000','Customer Clearing A/c','Merchant Payable A/c','₹1,000','Fund received from customer; owed to merchant'],
@@ -1062,7 +1100,7 @@ export default function App() {
                   ['8. Rolling Reserve released (after 90 days)','Rolling Reserve A/c','Bank Settlement A/c','₹70','Risk buffer released to merchant after holding period'],
                 ]}
               />
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(170px, 1fr))', gap:'8px', marginTop:'14px' }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(175px, 1fr))', gap:'9px', marginTop:'15px' }}>
                 {[
                   { state:'Pending Balance', def:'Auth hold placed — funds reserved, not yet debited from card', color:C.gold },
                   { state:'Available Balance', def:'Funds fully captured and confirmed by issuer bank', color:C.green },
@@ -1071,9 +1109,9 @@ export default function App() {
                   { state:'Chargeback Liability', def:'Funds held for open dispute that may result in reversal', color:C.red },
                   { state:'Settled Amount', def:'Amount already paid out to merchant bank account', color:C.cyan },
                 ].map((b,i) => (
-                  <div key={i} style={{ padding:'10px', background:`${b.color}08`, border:`1px solid ${b.color}20`, borderRadius:'7px' }}>
-                    <div style={{ color:b.color, fontWeight:'700', fontSize:'12px', marginBottom:'4px' }}>{b.state}</div>
-                    <div style={{ color:C.muted, fontSize:'11px' }}>{b.def}</div>
+                  <div key={i} style={{ padding:'11px', background:`${b.color}09`, border:`1px solid ${b.color}22`, borderRadius:'8px' }}>
+                    <div style={{ color:b.color, fontWeight:'700', fontSize:'13px', marginBottom:'5px' }}>{b.state}</div>
+                    <div style={{ color:C.muted, fontSize:'12.5px' }}>{b.def}</div>
                   </div>
                 ))}
               </div>
@@ -1095,9 +1133,9 @@ export default function App() {
                   ['Settlement Fee','Per-transaction fee for fund transfer to merchant bank','Merchant','Acquirer / Gateway','₹0.50–₹5 per settlement transfer'],
                 ]}
               />
-              <div style={{ marginTop:'14px', padding:'14px', background:`${C.gold}08`, border:`1px solid ${C.gold}20`, borderRadius:'8px' }}>
-                <div style={{ color:C.gold, fontWeight:'700', fontSize:'13px', marginBottom:'8px' }}>MDR Split on ₹1,000 Transaction at 2% MDR</div>
-                <div style={{ display:'flex', gap:'10px', flexWrap:'wrap' }}>
+              <div style={{ marginTop:'15px', padding:'15px', background:`${C.gold}09`, border:`1px solid ${C.gold}22`, borderRadius:'9px' }}>
+                <div style={{ color:C.gold, fontWeight:'700', fontSize:'14px', marginBottom:'9px' }}>MDR Split on ₹1,000 Transaction at 2% MDR</div>
+                <div style={{ display:'flex', gap:'11px', flexWrap:'wrap' }}>
                   {[
                     { party:'Interchange → Issuer', pct:'1.4%', amt:'₹14', color:C.cyan },
                     { party:'Scheme Fee → Network', pct:'0.1%', amt:'₹1', color:C.gold },
@@ -1105,10 +1143,10 @@ export default function App() {
                     { party:'Gateway Margin', pct:'0.2%', amt:'₹2', color:C.purple },
                     { party:'Merchant Receives', pct:'98%', amt:'₹980 (net)', color:C.orange },
                   ].map((r,i) => (
-                    <div key={i} style={{ flex:1, minWidth:'140px', padding:'10px 12px', background:`${r.color}09`, border:`1px solid ${r.color}22`, borderRadius:'7px', textAlign:'center' }}>
-                      <div style={{ color:r.color, fontWeight:'800', fontSize:'16px' }}>{r.amt}</div>
-                      <div style={{ color:r.color, fontWeight:'600', fontSize:'11.5px' }}>{r.pct}</div>
-                      <div style={{ color:C.muted, fontSize:'11px', marginTop:'2px' }}>{r.party}</div>
+                    <div key={i} style={{ flex:1, minWidth:'145px', padding:'11px 13px', background:`${r.color}10`, border:`1px solid ${r.color}25`, borderRadius:'8px', textAlign:'center' }}>
+                      <div style={{ color:r.color, fontWeight:'800', fontSize:'18px' }}>{r.amt}</div>
+                      <div style={{ color:r.color, fontWeight:'600', fontSize:'12.5px' }}>{r.pct}</div>
+                      <div style={{ color:C.muted, fontSize:'12px', marginTop:'3px' }}>{r.party}</div>
                     </div>
                   ))}
                 </div>
@@ -1117,20 +1155,20 @@ export default function App() {
             </SectionCard>
 
             <SectionCard title="MERCHANT ONBOARDING LIFECYCLE — 5 STEPS" color={C.cyan} icon="🏪">
-              <p style={{ color:'#b0c4de', fontSize:'12px', lineHeight:'1.6', marginBottom:'14px' }}>Merchant onboarding is the commercial, compliance, and technical gateway into the payments platform. If this flow is weak — fraud, AML issues, chargebacks, and operational losses rise later. Every step has regulatory requirements.</p>
+              <p style={{ color:C.body, fontSize:'13.5px', lineHeight:'1.65', marginBottom:'15px' }}>Merchant onboarding is the commercial, compliance, and technical gateway into the payments platform. If this flow is weak — fraud, AML issues, chargebacks, and operational losses rise later. Every step has regulatory requirements.</p>
               {[
-                { step:'01', title:'Application & Signup', color:C.cyan, items:['Business name, registered address, PAN, CIN (for companies)', 'GST registration certificate', 'Bank account details (current account for settlement — not savings)', 'Business model description + website URL for review', 'Expected monthly turnover (TPV estimate) and average ticket size', 'MCC (Merchant Category Code) selection and validation'] },
-                { step:'02', title:'KYC & Risk Assessment', color:C.gold, items:['KYC documents: Aadhaar, PAN, Certificate of Incorporation, bank statement (6 months)', 'AML screening: OFAC, UN, RBI domestic sanctions watchlist cross-check', 'UBO identification: who owns >25% stake — full KYC on each UBO', 'Business category risk scoring: high-risk MCCs get deeper scrutiny (gambling, pharma, crypto, adult)', 'Website compliance review: T&C, refund policy, delivery timeline, contact info must be displayed', 'MCC mapping accuracy: wrong MCC breaks pricing, fraud rules, and reporting'] },
-                { step:'03', title:'Commercial Agreement', color:C.orange, items:['Settlement cycle agreed: T+1 / T+2 / T+7 (lower TPV merchants get T+7)', 'MDR rate negotiation and contract signing (higher TPV = lower MDR)', 'Rolling reserve terms: % withheld and holding period (higher risk = higher %; standard 90 days)', 'Chargeback liability clauses: who bears cost; threshold before review', 'Escalation and dispute process, SLA commitments', 'Instant settlement product if required (premium pricing)'] },
-                { step:'04', title:'Technical Integration', color:C.purple, items:['API key generation: test environment + production environment (separate keys)', 'Webhook URL setup: test firing and signature verification testing', 'Sandbox testing: all scenarios — success, decline, timeout, refund, chargeback, partial capture', 'Go-live checklist: IP whitelisting, SSL certificate, 3DS config, tokenization setup', 'Payment method configuration: enable/disable card/UPI/NB/wallet per merchant needs', 'MDR configuration validation in fee engine: verify merchant gets correct rates'] },
-                { step:'05', title:'Post Go-Live Monitoring', color:C.green, items:['Real-time transaction monitoring dashboard for merchant', 'Fraud spike detection with auto-alert at 2× baseline fraud rate', 'Chargeback rate tracking vs Visa/MC thresholds (alert at 0.65%; block at 1%)', 'Periodic KYC refresh: annually for all merchants; immediately on adverse media alert', 'Website compliance periodic checks: ensure T&C, refund policy still displayed', 'Revenue tracking: GMV, transaction count, auth rate, method mix, settlement amounts'] },
+                { step:'01', title:'Application & Signup', color:C.cyan, items:['Business name, registered address, PAN, CIN (for companies)','GST registration certificate','Bank account details (current account for settlement — not savings)','Business model description + website URL for review','Expected monthly turnover (TPV estimate) and average ticket size','MCC (Merchant Category Code) selection and validation'] },
+                { step:'02', title:'KYC & Risk Assessment', color:C.gold, items:['KYC documents: Aadhaar, PAN, Certificate of Incorporation, bank statement (6 months)','AML screening: OFAC, UN, RBI domestic sanctions watchlist cross-check','UBO identification: who owns >25% stake — full KYC on each UBO','Business category risk scoring: high-risk MCCs get deeper scrutiny (gambling, pharma, crypto, adult)','Website compliance review: T&C, refund policy, delivery timeline, contact info must be displayed','MCC mapping accuracy: wrong MCC breaks pricing, fraud rules, and reporting'] },
+                { step:'03', title:'Commercial Agreement', color:C.orange, items:['Settlement cycle agreed: T+1 / T+2 / T+7 (lower TPV merchants get T+7)','MDR rate negotiation and contract signing (higher TPV = lower MDR)','Rolling reserve terms: % withheld and holding period (higher risk = higher %; standard 90 days)','Chargeback liability clauses: who bears cost; threshold before review','Escalation and dispute process, SLA commitments','Instant settlement product if required (premium pricing)'] },
+                { step:'04', title:'Technical Integration', color:C.purple, items:['API key generation: test environment + production environment (separate keys)','Webhook URL setup: test firing and signature verification testing','Sandbox testing: all scenarios — success, decline, timeout, refund, chargeback, partial capture','Go-live checklist: IP whitelisting, SSL certificate, 3DS config, tokenization setup','Payment method configuration: enable/disable card/UPI/NB/wallet per merchant needs','MDR configuration validation in fee engine: verify merchant gets correct rates'] },
+                { step:'05', title:'Post Go-Live Monitoring', color:C.green, items:['Real-time transaction monitoring dashboard for merchant','Fraud spike detection with auto-alert at 2× baseline fraud rate','Chargeback rate tracking vs Visa/MC thresholds (alert at 0.65%; block at 1%)','Periodic KYC refresh: annually for all merchants; immediately on adverse media alert','Website compliance periodic checks: ensure T&C, refund policy still displayed','Revenue tracking: GMV, transaction count, auth rate, method mix, settlement amounts'] },
               ].map((s,i) => (
-                <div key={i} style={{ display:'flex', gap:'0', marginBottom:'8px' }}>
-                  <div style={{ width:'60px', flexShrink:0, background:`${s.color}15`, border:`1px solid ${s.color}30`, borderRadius:'8px 0 0 8px', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'800', color:s.color, fontSize:'18px' }}>{s.step}</div>
-                  <div style={{ flex:1, background:`${s.color}05`, border:`1px solid ${s.color}18`, borderLeft:'none', borderRadius:'0 8px 8px 0', padding:'12px 16px' }}>
-                    <div style={{ color:s.color, fontWeight:'700', fontSize:'13px', marginBottom:'8px' }}>{s.title}</div>
-                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(260px, 1fr))', gap:'4px' }}>
-                      {s.items.map((item,j) => <div key={j} style={{ fontSize:'11.5px', color:'#b0c4de', paddingLeft:'10px', borderLeft:`2px solid ${s.color}30` }}>{item}</div>)}
+                <div key={i} style={{ display:'flex', gap:'0', marginBottom:'9px' }}>
+                  <div style={{ width:'62px', flexShrink:0, background:`${s.color}16`, border:`1px solid ${s.color}32`, borderRadius:'9px 0 0 9px', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'800', color:s.color, fontSize:'19px' }}>{s.step}</div>
+                  <div style={{ flex:1, background:`${s.color}06`, border:`1px solid ${s.color}20`, borderLeft:'none', borderRadius:'0 9px 9px 0', padding:'13px 18px' }}>
+                    <div style={{ color:s.color, fontWeight:'700', fontSize:'14px', marginBottom:'9px' }}>{s.title}</div>
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(270px, 1fr))', gap:'5px' }}>
+                      {s.items.map((item,j) => <div key={j} style={{ fontSize:'13px', color:C.body, paddingLeft:'11px', borderLeft:`2px solid ${s.color}32` }}>{item}</div>)}
                     </div>
                   </div>
                 </div>
@@ -1138,16 +1176,14 @@ export default function App() {
             </SectionCard>
 
             <SectionCard title="NODAL / ESCROW ACCOUNT — RBI MANDATE" color={C.teal} icon="🏦">
-              <p style={{ color:'#b0c4de', fontSize:'12px', lineHeight:'1.6', marginBottom:'12px' }}>Under RBI's Payment Aggregator (PA) Guidelines, all Payment Aggregators must hold merchant funds in a Nodal Account until settlement. This prevents PAs from misusing merchant funds.</p>
+              <p style={{ color:C.body, fontSize:'13.5px', lineHeight:'1.65', marginBottom:'13px' }}>Under RBI's Payment Aggregator (PA) Guidelines, all Payment Aggregators must hold merchant funds in a Nodal Account until settlement. This prevents PAs from misusing merchant funds.</p>
               <FlowRow color={C.teal} steps={['Customer pays ₹1,000','Funds received in Nodal A/c (held by PA)','PA calculates Net: ₹1,000 - MDR - Reserve','T+1 Settlement: Net credited to Merchant Bank','PA reconciles Nodal A/c daily — must match pending settlements']} />
               <BANote text="PA cannot earn interest on nodal account funds. Daily reconciliation of nodal account is mandatory — balance must equal total pending settlements. Any mismatch is a regulatory red flag. BA must design: daily nodal recon report, exception alerting, and pending-settlement ageing dashboard." color={C.teal} />
             </SectionCard>
           </div>
         )}
 
-        {/* ═══════════════════════════════════════════════
-            TAB 9 — SIMULATOR
-        ═══════════════════════════════════════════════ */}
+        {/* ═══ TAB 9 — SIMULATOR ═══ */}
         {tab===9 && (() => {
           const currentFlow = SIM_FLOWS[simMethod];
           const insights = simInsights[simMethod] || [];
@@ -1159,42 +1195,42 @@ export default function App() {
           };
           return (
             <div>
-              <h2 style={{ color:C.gold, margin:'0 0 4px', fontSize:'18px' }}>🧪 Payment Transaction Simulator</h2>
-              <p style={{ color:C.muted, fontSize:'12px', marginBottom:'20px' }}>Step through any payment method and see every internal hop in real-time. Each step reveals a BA insight.</p>
+              <h2 style={{ color:C.gold, margin:'0 0 5px', fontSize:'20px' }}>🧪 Payment Transaction Simulator</h2>
+              <p style={{ color:C.muted, fontSize:'14px', marginBottom:'22px' }}>Step through any payment method and see every internal hop in real-time. Each step reveals a BA insight.</p>
 
-              <div style={{ display:'flex', gap:'10px', marginBottom:'20px', flexWrap:'wrap', alignItems:'center' }}>
+              <div style={{ display:'flex', gap:'11px', marginBottom:'22px', flexWrap:'wrap', alignItems:'center' }}>
                 {[{id:'card',label:'💳 Card (3DS)',color:C.cyan},{id:'upi',label:'⚡ UPI Pay',color:C.gold},{id:'netbanking',label:'🌐 Net Banking',color:C.green},{id:'wallet',label:'👜 Wallet (PPI)',color:C.purple}].map(m => (
-                  <button key={m.id} onClick={() => { setSimMethod(m.id); resetSim(); }} style={{ padding:'10px 20px', borderRadius:'8px', cursor:'pointer', fontSize:'13px', fontWeight:'600', transition:'all 0.15s', border: simMethod===m.id ? `2px solid ${m.color}` : `1px solid ${C.border}`, background: simMethod===m.id ? `${m.color}15` : C.surface, color: simMethod===m.id ? m.color : C.muted, boxShadow: simMethod===m.id ? `0 0 16px ${m.color}20` : 'none' }}>{m.label}</button>
+                  <button key={m.id} onClick={() => { setSimMethod(m.id); resetSim(); }} style={{ padding:'11px 22px', borderRadius:'9px', cursor:'pointer', fontSize:'14px', fontWeight:'600', transition:'all 0.15s', border: simMethod===m.id ? `2px solid ${m.color}` : `1px solid ${C.border}`, background: simMethod===m.id ? `${m.color}15` : C.surface, color: simMethod===m.id ? m.color : C.muted, boxShadow: simMethod===m.id ? `0 0 18px ${m.color}22` : 'none' }}>{m.label}</button>
                 ))}
-                <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:'10px' }}>
-                  <span style={{ color:C.muted, fontSize:'12px' }}>Auto-Play</span>
-                  <div onClick={() => setAutoPlay(v => !v)} style={{ width:'44px', height:'24px', borderRadius:'12px', background: autoPlay ? `${C.cyan}40` : C.border, border:`1px solid ${autoPlay ? C.cyan : C.muted}`, cursor:'pointer', position:'relative', transition:'all 0.2s' }}>
-                    <div style={{ position:'absolute', top:'3px', left: autoPlay ? '22px' : '3px', width:'16px', height:'16px', borderRadius:'50%', background: autoPlay ? C.cyan : C.muted, transition:'left 0.2s' }} />
+                <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:'11px' }}>
+                  <span style={{ color:C.muted, fontSize:'13px' }}>Auto-Play</span>
+                  <div onClick={() => setAutoPlay(v => !v)} style={{ width:'46px', height:'26px', borderRadius:'13px', background: autoPlay ? `${C.cyan}45` : C.border, border:`1px solid ${autoPlay ? C.cyan : C.muted}`, cursor:'pointer', position:'relative', transition:'all 0.2s' }}>
+                    <div style={{ position:'absolute', top:'3px', left: autoPlay ? '23px' : '3px', width:'18px', height:'18px', borderRadius:'50%', background: autoPlay ? C.cyan : C.muted, transition:'left 0.2s' }} />
                   </div>
                 </div>
               </div>
 
-              <div ref={simRef} style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:'12px', padding:'20px', marginBottom:'16px' }}>
-                <div style={{ display:'flex', alignItems:'center', gap:'12px', marginBottom:'20px' }}>
-                  <div style={{ flex:1, height:'4px', background:'#1a2540', borderRadius:'2px', overflow:'hidden' }}>
-                    <div style={{ height:'100%', background:`linear-gradient(90deg, ${C.cyan}, ${C.gold})`, borderRadius:'2px', width: simStep<0 ? '0%' : `${((simStep+1)/currentFlow.length)*100}%`, transition:'width 0.4s ease' }} />
+              <div ref={simRef} style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:'14px', padding:'22px', marginBottom:'18px', boxShadow: dark ? 'none' : '0 4px 20px rgba(0,0,0,0.06)' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:'13px', marginBottom:'22px' }}>
+                  <div style={{ flex:1, height:'5px', background:C.border, borderRadius:'3px', overflow:'hidden' }}>
+                    <div style={{ height:'100%', background:`linear-gradient(90deg, ${C.cyan}, ${C.gold})`, borderRadius:'3px', width: simStep<0 ? '0%' : `${((simStep+1)/currentFlow.length)*100}%`, transition:'width 0.4s ease' }} />
                   </div>
-                  <span style={{ color:C.muted, fontSize:'12px', minWidth:'60px' }}>{simStep<0?'0':simStep+1} / {currentFlow.length}</span>
+                  <span style={{ color:C.muted, fontSize:'13px', minWidth:'65px' }}>{simStep<0?'0':simStep+1} / {currentFlow.length}</span>
                 </div>
-                <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
+                <div style={{ display:'flex', flexDirection:'column', gap:'7px' }}>
                   {currentFlow.map((step,i) => {
                     const active = i===simStep, done = i<simStep, future = i>simStep;
                     return (
-                      <div key={i} ref={active ? activeStepRef : null} style={{ display:'flex', gap:'12px', padding:'12px 16px', borderRadius:'8px', transition:'all 0.35s', background: active ? `${step.color}12` : done ? `${step.color}05` : 'transparent', border:`1px solid ${active ? step.color+'50' : done ? step.color+'20' : C.border}`, opacity: future && simStep>=0 ? 0.35 : 1, transform: active ? 'translateX(4px)' : 'none', boxShadow: active ? `0 0 20px ${step.color}18` : 'none' }}>
-                        <div style={{ width:'30px', flexShrink:0, display:'flex', alignItems:'flex-start', paddingTop:'2px' }}>
-                          <div style={{ width:'28px', height:'28px', borderRadius:'50%', background: active ? `${step.color}25` : done ? `${step.color}15` : C.border, border:`2px solid ${active ? step.color : done ? step.color+'60' : C.border}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize: done ? '12px' : '11px', color: active ? step.color : done ? step.color : C.muted, transition:'all 0.3s' }}>{done ? '✓' : i+1}</div>
+                      <div key={i} ref={active ? activeStepRef : null} style={{ display:'flex', gap:'13px', padding:'13px 18px', borderRadius:'9px', transition:'all 0.35s', background: active ? `${step.color}14` : done ? `${step.color}06` : 'transparent', border:`1px solid ${active ? step.color+'55' : done ? step.color+'22' : C.border}`, opacity: future && simStep>=0 ? 0.4 : 1, transform: active ? 'translateX(5px)' : 'none', boxShadow: active ? `0 0 22px ${step.color}20` : 'none' }}>
+                        <div style={{ width:'32px', flexShrink:0, display:'flex', alignItems:'flex-start', paddingTop:'2px' }}>
+                          <div style={{ width:'30px', height:'30px', borderRadius:'50%', background: active ? `${step.color}28` : done ? `${step.color}16` : C.border, border:`2px solid ${active ? step.color : done ? step.color+'65' : C.border}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize: done ? '13px' : '12px', color: active ? step.color : done ? step.color : C.muted, transition:'all 0.3s' }}>{done ? '✓' : i+1}</div>
                         </div>
                         <div style={{ flex:1 }}>
-                          <div style={{ display:'flex', justifyContent:'space-between', gap:'8px', flexWrap:'wrap' }}>
-                            <span style={{ color: active ? step.color : done ? step.color+'cc' : C.muted, fontWeight: active ? '700' : '600', fontSize:'12.5px' }}>{step.actor}</span>
-                            <span style={{ fontFamily:'monospace', fontSize:'10.5px', color: active ? step.color+'aa' : C.muted, background:'#0a0f1a', padding:'2px 7px', borderRadius:'3px' }}>{step.tech}</span>
+                          <div style={{ display:'flex', justifyContent:'space-between', gap:'9px', flexWrap:'wrap' }}>
+                            <span style={{ color: active ? step.color : done ? step.color+'cc' : C.muted, fontWeight: active ? '700' : '600', fontSize:'13.5px' }}>{step.actor}</span>
+                            <span style={{ fontFamily:'monospace', fontSize:'11.5px', color: active ? step.color+'aa' : C.muted, background:C.codeBg, padding:'2px 8px', borderRadius:'4px' }}>{step.tech}</span>
                           </div>
-                          <div style={{ color: active ? '#e0e8ff' : done ? '#90a0b8' : '#606878', fontSize:'12px', marginTop:'4px', transition:'color 0.3s' }}>{step.action}</div>
+                          <div style={{ color: active ? C.text : done ? C.stepDone : C.faint, fontSize:'13px', marginTop:'5px', transition:'color 0.3s' }}>{step.action}</div>
                         </div>
                       </div>
                     );
@@ -1202,27 +1238,27 @@ export default function App() {
                 </div>
               </div>
 
-              <div style={{ display:'flex', gap:'10px', justifyContent:'center', flexWrap:'wrap', marginBottom:'14px' }}>
+              <div style={{ display:'flex', gap:'11px', justifyContent:'center', flexWrap:'wrap', marginBottom:'15px' }}>
                 {simStep<0 ? (
-                  <button onClick={startSim} style={{ padding:'12px 32px', borderRadius:'8px', background:`linear-gradient(135deg, ${C.cyan}, #0066ff)`, border:'none', color:'#fff', fontWeight:'700', fontSize:'13px', cursor:'pointer', boxShadow:`0 0 20px ${C.cyan}30` }}>▶ Start Simulation</button>
+                  <button onClick={startSim} style={{ padding:'13px 34px', borderRadius:'9px', background:`linear-gradient(135deg, ${C.cyan}, ${C.blue})`, border:'none', color:'#fff', fontWeight:'700', fontSize:'14px', cursor:'pointer', boxShadow:`0 4px 18px ${C.cyan}35` }}>▶ Start Simulation</button>
                 ) : (
                   <>
                     {simStep < currentFlow.length-1 ? (
-                      <button onClick={nextStep} style={{ padding:'12px 28px', borderRadius:'8px', background:`${C.gold}18`, border:`1px solid ${C.gold}50`, color:C.gold, fontWeight:'700', fontSize:'13px', cursor:'pointer' }}>Next Step →</button>
+                      <button onClick={nextStep} style={{ padding:'13px 30px', borderRadius:'9px', background:`${C.gold}18`, border:`1px solid ${C.gold}55`, color:C.gold, fontWeight:'700', fontSize:'14px', cursor:'pointer' }}>Next Step →</button>
                     ) : (
-                      <div style={{ padding:'12px 24px', background:`${C.green}12`, border:`1px solid ${C.green}40`, borderRadius:'8px', color:C.green, fontWeight:'700', fontSize:'13px' }}>✅ Transaction Complete!</div>
+                      <div style={{ padding:'13px 26px', background:`${C.green}14`, border:`1px solid ${C.green}45`, borderRadius:'9px', color:C.green, fontWeight:'700', fontSize:'14px' }}>✅ Transaction Complete!</div>
                     )}
-                    <button onClick={resetSim} style={{ padding:'12px 22px', borderRadius:'8px', background:`${C.red}10`, border:`1px solid ${C.red}30`, color:C.red, fontWeight:'600', fontSize:'13px', cursor:'pointer' }}>↺ Reset</button>
+                    <button onClick={resetSim} style={{ padding:'13px 24px', borderRadius:'9px', background:`${C.red}10`, border:`1px solid ${C.red}32`, color:C.red, fontWeight:'600', fontSize:'14px', cursor:'pointer' }}>↺ Reset</button>
                   </>
                 )}
               </div>
 
               {simStep>=0 && insights[simStep] && (
-                <div style={{ padding:'14px 18px', background:`${currentFlow[simStep].color}09`, border:`1px solid ${currentFlow[simStep].color}30`, borderRadius:'8px', display:'flex', gap:'10px', alignItems:'flex-start' }}>
-                  <span style={{ fontSize:'18px', flexShrink:0 }}>💡</span>
+                <div style={{ padding:'15px 20px', background:`${currentFlow[simStep].color}10`, border:`1px solid ${currentFlow[simStep].color}32`, borderRadius:'9px', display:'flex', gap:'11px', alignItems:'flex-start' }}>
+                  <span style={{ fontSize:'19px', flexShrink:0 }}>💡</span>
                   <div>
-                    <div style={{ color:currentFlow[simStep].color, fontWeight:'700', fontSize:'12.5px', marginBottom:'3px' }}>Step {simStep+1} Insight</div>
-                    <div style={{ color:'#c0d0e8', fontSize:'12.5px', lineHeight:'1.6' }}>{insights[simStep]}</div>
+                    <div style={{ color:currentFlow[simStep].color, fontWeight:'700', fontSize:'13.5px', marginBottom:'4px' }}>Step {simStep+1} Insight</div>
+                    <div style={{ color:C.body, fontSize:'13.5px', lineHeight:'1.65' }}>{insights[simStep]}</div>
                   </div>
                 </div>
               )}
@@ -1230,21 +1266,19 @@ export default function App() {
           );
         })()}
 
-        {/* ═══════════════════════════════════════════════
-            TAB 10 — COMPARISON MATRIX
-        ═══════════════════════════════════════════════ */}
+        {/* ═══ TAB 10 — COMPARISON MATRIX ═══ */}
         {tab===10 && (
           <div>
-            <h2 style={{ color:C.gold, margin:'0 0 4px', fontSize:'18px' }}>📊 Payment Method Comparison Matrix</h2>
-            <p style={{ color:C.muted, fontSize:'12px', marginBottom:'20px' }}>Complete side-by-side comparison for BA analysis, product decisions, and interview prep</p>
+            <h2 style={{ color:C.gold, margin:'0 0 5px', fontSize:'20px' }}>📊 Payment Method Comparison Matrix</h2>
+            <p style={{ color:C.muted, fontSize:'14px', marginBottom:'22px' }}>Complete side-by-side comparison for BA analysis, product decisions, and interview prep</p>
 
             <SectionCard title="MASTER COMPARISON — ALL PAYMENT METHODS (11 DIMENSIONS)" color={C.gold} icon="📋">
               <div style={{ overflowX:'auto' }}>
-                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'12px', minWidth:'1000px' }}>
+                <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'13px', minWidth:'1050px' }}>
                   <thead>
-                    <tr style={{ borderBottom:`1px solid ${C.border}` }}>
+                    <tr style={{ borderBottom:`2px solid ${C.border}` }}>
                       {['Dimension','⚡ UPI','💳 Debit Card','💳 Credit Card','🌐 Net Banking','👜 Wallet (PPI)','🔄 NEFT','🔄 RTGS','🔄 NACH'].map((h,i) => (
-                        <th key={i} style={{ padding:'10px 12px', textAlign:'left', color: i===0 ? C.muted : C.gold, fontSize:'11px', fontWeight:'700', background:'#08101e', whiteSpace:'nowrap' }}>{h}</th>
+                        <th key={i} style={{ padding:'11px 13px', textAlign:'left', color: i===0 ? C.muted : C.gold, fontSize:'12px', fontWeight:'700', background:C.tableBg, whiteSpace:'nowrap', textTransform:'uppercase' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -1262,9 +1296,9 @@ export default function App() {
                       { dim:'📱 India Usage (2025)', vals:['85% of retail transaction count','Declining vs UPI; ~5% volume','Stable; ~7% value contribution','~4–6% of volume; high-value','Paytm, Amazon Pay, PhonePe wallet','~10% of value; corporate-heavy','~5% of volume; 40%+ of total value','EMI, insurance, SIP: growing fast'] },
                       { dim:'🏛️ Regulator', vals:['RBI + NPCI','RBI + Card Networks (Visa/MC/RuPay)','RBI + Card Networks','RBI + Individual Scheduled Banks','RBI (PA/PG + PPI guidelines)','RBI + NPCI','RBI + NPCI','RBI + NPCI'] },
                     ].map((row,ri) => (
-                      <tr key={ri} style={{ borderBottom:`1px solid #0d1520`, background: ri%2===0 ? 'transparent' : 'rgba(255,255,255,0.008)' }}>
-                        <td style={{ padding:'9px 12px', color:C.cyan, fontWeight:'700', fontSize:'12px', whiteSpace:'nowrap', background:'#08101e' }}>{row.dim}</td>
-                        {row.vals.map((v,vi) => <td key={vi} style={{ padding:'9px 12px', color:'#a8bcce', fontSize:'11.5px', verticalAlign:'top', lineHeight:'1.5' }}>{v}</td>)}
+                      <tr key={ri} style={{ borderBottom:`1px solid ${C.rowBorder}`, background: ri%2===0 ? 'transparent' : C.rowAlt }}>
+                        <td style={{ padding:'10px 13px', color:C.cyan, fontWeight:'700', fontSize:'13px', whiteSpace:'nowrap', background:C.tableBg }}>{row.dim}</td>
+                        {row.vals.map((v,vi) => <td key={vi} style={{ padding:'10px 13px', color:C.body, fontSize:'12.5px', verticalAlign:'top', lineHeight:'1.5' }}>{v}</td>)}
                       </tr>
                     ))}
                   </tbody>
@@ -1273,7 +1307,7 @@ export default function App() {
             </SectionCard>
 
             <SectionCard title="WHEN TO USE WHICH — BA DECISION GUIDE (10 SCENARIOS)" color={C.teal} icon="🎯">
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(290px, 1fr))', gap:'12px' }}>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(290px, 1fr))', gap:'13px' }}>
                 {[
                   { scenario:'Consumer paying at restaurant / kirana', winner:'⚡ UPI (QR Scan)', why:'Zero MDR for merchant, instant, no terminal needed, universal penetration in India', color:C.cyan },
                   { scenario:'eCommerce checkout with EMI and rewards', winner:'💳 Credit Card', why:'Customer wants EMI + reward points; merchant pays MDR for higher AOV and conversion', color:C.purple },
@@ -1286,11 +1320,11 @@ export default function App() {
                   { scenario:'Hotel booking with deferred final amount', winner:'💳 Card (pre-auth)', why:'Only instrument supporting delayed + partial capture; hotels need pre-auth hold on card', color:C.purple },
                   { scenario:'Unbanked rural customer payment', winner:'📲 UPI Lite / USSD *99#', why:'UPI Lite: offline NFC, no PIN, no internet; USSD: feature phone, BCs in rural areas, no smartphone', color:C.gold },
                 ].map((c,i) => (
-                  <div key={i} style={{ background:`${c.color}07`, border:`1px solid ${c.color}22`, borderRadius:'10px', padding:'14px' }}>
-                    <div style={{ color:C.muted, fontSize:'11px', marginBottom:'4px' }}>Use case</div>
-                    <div style={{ color:'#e0e8ff', fontWeight:'600', fontSize:'12.5px', marginBottom:'7px' }}>{c.scenario}</div>
-                    <div style={{ color:c.color, fontWeight:'700', fontSize:'13px', marginBottom:'6px' }}>{c.winner}</div>
-                    <div style={{ color:C.muted, fontSize:'11.5px', borderTop:`1px solid ${c.color}18`, paddingTop:'6px' }}>{c.why}</div>
+                  <div key={i} style={{ background:`${c.color}08`, border:`1px solid ${c.color}25`, borderRadius:'11px', padding:'15px' }}>
+                    <div style={{ color:C.muted, fontSize:'12px', marginBottom:'5px' }}>Use case</div>
+                    <div style={{ color:C.text, fontWeight:'600', fontSize:'13.5px', marginBottom:'8px' }}>{c.scenario}</div>
+                    <div style={{ color:c.color, fontWeight:'700', fontSize:'14px', marginBottom:'7px' }}>{c.winner}</div>
+                    <div style={{ color:C.muted, fontSize:'12.5px', borderTop:`1px solid ${c.color}20`, paddingTop:'7px' }}>{c.why}</div>
                   </div>
                 ))}
               </div>
@@ -1302,7 +1336,7 @@ export default function App() {
                   ['Authorization Rate','Approved auths / Total auth attempts × 100','>95% (industry)','Low auth rate = revenue leak; each 1% improvement can mean millions in GMV for large merchants'],
                   ['Payment Success Rate','Captured payments / Initiated payments × 100','>99% UPI; >94% cards','End-to-end success; failures here = customer experience failure + support cost'],
                   ['Chargeback Rate','Chargebacks in month / Transactions in month × 100','<0.65% (Visa early warning); <1% (standard)','Exceeding threshold = fines, rolling reserve increase, potential merchant termination'],
-                  ['Fraud Rate','Fraudulent transaction value / Total GMV × 100','<0.1% (industry)', 'Measured in basis points; each bp = significant dollar amount at scale'],
+                  ['Fraud Rate','Fraudulent transaction value / Total GMV × 100','<0.1% (industry)','Measured in basis points; each bp = significant dollar amount at scale'],
                   ['False Positive Rate','Legitimate transactions blocked / Total blocked × 100','<0.5%','Overly aggressive fraud control blocks genuine customers; BA must balance with fraud rate'],
                   ['Settlement TAT','Time from capture to merchant bank credit','T+1 standard; instant = premium','Merchant cash flow depends on this; define per merchant tier'],
                   ['Recon Match Rate','Matched transactions / Total transactions in file × 100','>99.9%','Sub-99.9% = operational exception volume; P1 investigation required above threshold'],
@@ -1317,5 +1351,6 @@ export default function App() {
 
       </div>
     </div>
+    </ThemeCtx.Provider>
   );
 }
